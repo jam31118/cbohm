@@ -28,18 +28,6 @@ int return_with_mesg(const char *mesg, int return_code) {
 }
 
 
-//int eval_psi_and_dpsidx_arr_form(
-//    double *x_p_arr, std::complex<double> *psi_arr, double *x_arr, 
-//    int N_s, int N_p, int N_x, const double *x_p_lim, 
-//    std::complex<double> *psi_p_arr, std::complex<double> *dpsidx_p_arr,
-//    ); 
-
-//int eval_psi_and_dpsidx_arr(
-//    double *x_p_arr, std::complex<double> *psi_arr, double *x_arr, 
-//    int N_s, int N_p, int N_x, const double *x_p_lim, 
-//    std::complex<double> *psi_p_arr, std::complex<double> *dpsidx_p_arr); 
-
-
 template <typename T>
 int eval_psi_and_dpsidx_arr(
     double *x_p_arr, T *psi_arr, double *x_arr, 
@@ -68,16 +56,7 @@ int eval_psi_and_dpsidx_arr(
   
   //// Aliasing
   const int num_of_stencils = N_s;
-  const int num_of_particles = N_p;
 
-
-  //// Construct array of indices for a set of stencils per particle
-  int **i_p_arr_arr = new int*[num_of_stencils];
-  i_p_arr_arr[0] = new int[num_of_stencils * num_of_particles];
-//  int *i_p_arr, *i_p_arr_max = i_p_arr_arr + num_of_stencils;
-  for (int i_s=0; i_s<N_s; ++i_s) {
-    i_p_arr_arr[i_s] = i_p_arr_arr[0] + i_s * num_of_particles; 
-  }
 
   //// Explanation on stencil system
   //
@@ -298,7 +277,6 @@ int eval_psi_and_dpsidx_arr(
 }
 
 
-
 //// Instantiation
 template int eval_psi_and_dpsidx_arr<double>(
     double *x_p_arr, double *psi_arr, double *x_arr, 
@@ -309,19 +287,4 @@ template int eval_psi_and_dpsidx_arr< std::complex<double> >(
     double *x_p_arr, std::complex<double> *psi_arr, double *x_arr, 
     int N_s, int N_p, int N_x, const double *x_p_lim, 
     std::complex<double> *psi_p_arr, std::complex<double> *dpsidx_p_arr);
-
-
-//int eval_psi_and_dpsidx_arr_double(
-//    double *x_p_arr, double *psi_arr, double *x_arr, 
-//    int N_s, int N_p, int N_x, const double *x_p_lim, 
-//    double *psi_p_arr, double *dpsidx_p_arr) {
-//
-//  return eval_psi_and_dpsidx_arr<double>(
-//    x_p_arr, psi_arr, x_arr, 
-//    N_s, N_p, N_x, x_p_lim, 
-//    psi_p_arr, dpsidx_p_arr, dgesv_);
-//
-//}
-
-
 
