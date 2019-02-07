@@ -1,3 +1,5 @@
+include ../../var.mk
+
 LIB_DIR=../../lib
 LIB_FLAGS = -L$(LIB_DIR) -lcbohm
 

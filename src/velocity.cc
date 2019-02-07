@@ -2,10 +2,8 @@
 
 
 int handle_gesv_info(int info) {
-  if (info == 0) {
-//    fprintf(stdout, "[ LOG ] Successful exit from 'dgesv_()'\n");
-  }
-  else {
+
+  if (info != 0) {
 
     fprintf(stderr, "[ERROR] Unsuccessful exit from 'dgesv_()'\n");
 
@@ -16,10 +14,10 @@ int handle_gesv_info(int info) {
     else if (info > 0) {
       fprintf(stderr, "[ERROR] [info == '%d'] singularity happended\n", info);  
     }
-
     return EXIT_FAILURE;
 
   }
+
   return EXIT_SUCCESS;
 }
 
@@ -30,12 +28,24 @@ int return_with_mesg(const char *mesg, int return_code) {
 }
 
 
+//int eval_psi_and_dpsidx_arr_form(
+//    double *x_p_arr, std::complex<double> *psi_arr, double *x_arr, 
+//    int N_s, int N_p, int N_x, const double *x_p_lim, 
+//    std::complex<double> *psi_p_arr, std::complex<double> *dpsidx_p_arr,
+//    ); 
+
+//int eval_psi_and_dpsidx_arr(
+//    double *x_p_arr, std::complex<double> *psi_arr, double *x_arr, 
+//    int N_s, int N_p, int N_x, const double *x_p_lim, 
+//    std::complex<double> *psi_p_arr, std::complex<double> *dpsidx_p_arr); 
+
+
+template <typename T>
 int eval_psi_and_dpsidx_arr(
-    double *x_p_arr, double *psi_arr, double *x_arr, 
+    double *x_p_arr, T *psi_arr, double *x_arr, 
     int N_s, int N_p, int N_x, const double *x_p_lim, 
-    double *psi_p_arr, double *dpsidx_p_arr) 
-{
-  
+    T *psi_p_arr, T *dpsidx_p_arr) {
+
   //// Function Arguments
   //
   // `N_s`: the number of stencils used for finite difference expression
@@ -145,6 +155,7 @@ int eval_psi_and_dpsidx_arr(
   int gesv_info;
 
 
+
   for (
       x_p_arr_p = x_p_arr, 
       psi_p_arr_p = psi_p_arr, dpsidx_p_arr_p = dpsidx_p_arr;
@@ -152,7 +163,6 @@ int eval_psi_and_dpsidx_arr(
       ++x_p_arr_p, ++psi_p_arr_p, ++dpsidx_p_arr_p
       )
   {
-
 
     x_p = *x_p_arr_p;
 
@@ -234,8 +244,6 @@ int eval_psi_and_dpsidx_arr(
     }
 
 
-
-
 #ifdef DEBUG
 
     printf("power_matrix_1d: ");
@@ -249,8 +257,6 @@ int eval_psi_and_dpsidx_arr(
 
 #endif // DEBUG
     
-
-
 
     //// Evaluate the finite-difference-approximated values: psi, dpsidx
     *psi_p_arr_p = 0, *dpsidx_p_arr_p = 0;
@@ -273,7 +279,6 @@ int eval_psi_and_dpsidx_arr(
 #endif // DEBUG
 
     }
-    
   
   } // for-loop `x_p_arr_p`
 
@@ -287,25 +292,17 @@ int eval_psi_and_dpsidx_arr(
   delete [] b_vec_matrix;
 
 
-//  int *i_p_arr_p;
-//  int *i_p_arr_p_start = i_p_arr_arr[index_of_nearest_left_stencil];
-//  int *i_p_arr_p_max = i_p_arr_p_start + N_p;
-//  double *x_p_arr_p;
-////  double *x_p_arr_p_start = x_p_arr;
-////  double *x_p_arr_p_max = x_p_arr_p_start + N_x;
-//  for (
-//      i_p_arr_p = i_p_arr_p_start, x_p_arr_p = x_p_arr;
-//      i_p_arr_p < i_p_arr_p_max;
-//      ++i_p_arr_p, ++x_p_arr_p
-//      ) 
-//  {
-//    *i_p_arr_p = (int) (*x_p_arr_p - *x_arr) / delta_x;
-//  }
-//
-//
-//  delete [] i_p_arr_arr[0];
-//  delete [] i_p_arr_arr;
-
   // Returns if everything is fine.
   return EXIT_SUCCESS;
 }
+
+
+
+//// Instantiation
+template int eval_psi_and_dpsidx_arr<double>(
+    double *x_p_arr, double *psi_arr, double *x_arr, 
+    int N_s, int N_p, int N_x, const double *x_p_lim, 
+    double *psi_p_arr, double *dpsidx_p_arr);
+
+
+

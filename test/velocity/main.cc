@@ -44,7 +44,7 @@ int main(int argc, char *argv[]) {
 
   int return_code = EXIT_FAILURE;
 
-  return_code = eval_psi_and_dpsidx_arr(
+  return_code = eval_psi_and_dpsidx_arr<double>(
       x_p_arr, psi_arr, x_arr, 
       N_s, N_p, N_x, x_p_lim, 
       psi_p_arr, dpsidx_p_arr);
