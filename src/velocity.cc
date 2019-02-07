@@ -119,7 +119,7 @@ int eval_psi_and_dpsidx_arr(
   const int N_s_on_right = num_of_stencils - N_s_on_left - 1;
 
   double *x_p_arr_p, *x_p_arr_p_max = x_p_arr + N_p;
-  double *psi_p_arr_p, *dpsidx_p_arr_p;
+  T *psi_p_arr_p, *dpsidx_p_arr_p;
   double x_p;
 
   int *i_x_s_arr = new int[num_of_stencils];
@@ -154,7 +154,7 @@ int eval_psi_and_dpsidx_arr(
   int *pivot_indices = new int[num_of_stencils];
   int gesv_info;
 
-
+  T psi_x_s;
 
   for (
       x_p_arr_p = x_p_arr, 
@@ -236,6 +236,7 @@ int eval_psi_and_dpsidx_arr(
     
     //// Solve linear system for obtaining finite-difference coefficients
     dgesv_(
+//    gesv_(
         &N_s, &b_vec_matrix_col_num, power_matrix_1d, &N_s, 
         pivot_indices, b_vec_matrix_1d, &N_s, &gesv_info
     );
@@ -261,7 +262,7 @@ int eval_psi_and_dpsidx_arr(
     //// Evaluate the finite-difference-approximated values: psi, dpsidx
     *psi_p_arr_p = 0, *dpsidx_p_arr_p = 0;
     for (int i_s = 0; i_s < N_s; i_s++) {
-      double psi_x_s = psi_arr[i_x_s_arr[i_s]];
+      psi_x_s = psi_arr[i_x_s_arr[i_s]];
       *psi_p_arr_p += coef_vec_matrix[0][i_s] * psi_x_s;
       *dpsidx_p_arr_p += coef_vec_matrix[1][i_s] * psi_x_s;
 
@@ -303,6 +304,24 @@ template int eval_psi_and_dpsidx_arr<double>(
     double *x_p_arr, double *psi_arr, double *x_arr, 
     int N_s, int N_p, int N_x, const double *x_p_lim, 
     double *psi_p_arr, double *dpsidx_p_arr);
+
+template int eval_psi_and_dpsidx_arr< std::complex<double> >(
+    double *x_p_arr, std::complex<double> *psi_arr, double *x_arr, 
+    int N_s, int N_p, int N_x, const double *x_p_lim, 
+    std::complex<double> *psi_p_arr, std::complex<double> *dpsidx_p_arr);
+
+
+//int eval_psi_and_dpsidx_arr_double(
+//    double *x_p_arr, double *psi_arr, double *x_arr, 
+//    int N_s, int N_p, int N_x, const double *x_p_lim, 
+//    double *psi_p_arr, double *dpsidx_p_arr) {
+//
+//  return eval_psi_and_dpsidx_arr<double>(
+//    x_p_arr, psi_arr, x_arr, 
+//    N_s, N_p, N_x, x_p_lim, 
+//    psi_p_arr, dpsidx_p_arr, dgesv_);
+//
+//}
 
 
 
