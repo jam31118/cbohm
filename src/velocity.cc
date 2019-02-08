@@ -423,9 +423,9 @@ int eval_v_p_arr_for_sph_harm_basis(
       denum_p_arr[i_p] += psi_p * Ylm;
       numer_p_rho_arr[i_p] += dpsi_p * Ylm;
       numer_p_theta_arr[i_p] 
-        += -cos(theta_p) * l * phi_p * Ylm
+        += -cos(theta_p) * l * psi_p * Ylm
         + sqrt( (2.0*l+1.0)/(2.0*l+3.0) * (l+1.0+m) * (l+1.0-m) )
-          * phi_p * Yl1m;
+          * psi_p * Yl1m;
       numer_p_phi_arr[i_p] += m * psi_p * Ylm;
       
     } // i_p

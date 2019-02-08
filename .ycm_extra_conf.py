@@ -33,6 +33,10 @@ BASE_FLAGS = [
     '-I{}/include'.format(environ['GSL_HOME']),
     '-L{}/lib'.format(environ['GSL_HOME']),
     '-lgsl',
+
+    '-I{}/src'.format(environ['QPROP_HOME']),
+    '-L{}/lib/x86_64'.format(environ['QPROP_HOME']),
+    '-lqprop',
 ]
 
 SOURCE_EXTENSIONS = [  

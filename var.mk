@@ -1,3 +1,6 @@
 LAPACK_LIB_FLAGS=-L$(LAPACK_LIB_DIR) -llapack -lblas -lgfortran
 GSL_LIB_FLAGS=-L$(GSL_HOME)/lib -lgsl
 GSL_INC_FLAGS=-I$(GSL_HOME)/include
+QPROP_LIB_FLAGS=-L$(QPROP_HOME)/lib/x86_64 -lqprop
+QPROP_INC_FLAGS=-I$(QPROP_HOME)/src
+
