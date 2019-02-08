@@ -10,18 +10,6 @@
 #endif // DEBUG
 #include <cassert>
 
-extern "C" {
-
-extern int dgesv_(
-    int *n, int *nrhs, double *A, int *lda, int *ipiv, double *B, 
-    int *ldb, int *info);
-
-}
-
-int handle_gesv_info(int info);
-
-int return_with_mesg(const char *mesg, int return_code=EXIT_FAILURE);
-
 template <typename T>
 int eval_psi_and_dpsidx_arr(
     double *x_p_arr, T *psi_arr, double *x_arr, 
