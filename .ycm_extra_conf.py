@@ -28,15 +28,11 @@ BASE_FLAGS = [
     #'/usr/lib',
     #'-isystem',
     #'/usr/local/lib',
-    '-I/usr/include',
+#    '-I/usr/include',
 #    '-I/usr/local/include',
-#    '-I{}/openmpi/include'.format(environ['QPROP_DEP_DIR']),
-#    '-L{}/openmpi/lib'.format(environ['QPROP_DEP_DIR']),
-#    '-lmpi',
-#    '-lmpi_cxx',
-    #'-I./include',
-    #'-I./module',
-    #'-I./core'
+    '-I{}/include'.format(environ['GSL_HOME']),
+    '-L{}/lib'.format(environ['GSL_HOME']),
+    '-lgsl',
 ]
 
 SOURCE_EXTENSIONS = [  
