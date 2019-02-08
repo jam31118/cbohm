@@ -11,10 +11,10 @@ install: $(LIB_DIR)/libcbohm.so
 
 $(LIB_DIR)/libcbohm.so: velocity.o log.o lapack.o
 	mkdir -p $(LIB_DIR)
-	$(CXX) -shared -fPIC $^ -o $@ $(LAPACK_LIB_FLAGS)
+	$(CXX) -shared -fPIC $^ -o $@ $(LAPACK_LIB_FLAGS) $(GSL_LIB_FLAGS) 
 
 velocity.o: velocity.cc
-	$(CXX) -fPIC -c $< -o $@ $(OPTIMIZE_FLAGS) $(DEBUG_FLAGS)
+	$(CXX) -fPIC -c $< -o $@ $(OPTIMIZE_FLAGS) $(DEBUG_FLAGS) $(GSL_INC_FLAGS)
 
 log.o: log.cc
 	$(CXX) -fPIC -c $< -o $@ $(OPTIMIZE_FLAGS) $(DEBUG_FLAGS)
