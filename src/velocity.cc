@@ -111,7 +111,6 @@ int eval_psi_and_dpsidx_arr(
 
   T psi_x_s;
 
-  printf("ii before main x_p loop\n");
 
   for (
       x_p_arr_p = x_p_arr, 
@@ -123,12 +122,10 @@ int eval_psi_and_dpsidx_arr(
 
     x_p = *x_p_arr_p;
 
-    printf("ii before conitnue\n");
     //// Check in-range
     if (x_p_lim[0] > x_p or x_p >= x_p_lim[1]) { continue; }
-    printf("ii after conitnue\n");
-
   
+
     i_x_s_at_nls = (x_p - x_arr[0]) / delta_x;
 
     shift_offset_to_right = N_s_on_left - i_x_s_at_nls;
@@ -140,8 +137,6 @@ int eval_psi_and_dpsidx_arr(
       return return_with_mesg("Cannot shift to both direction");
     }
 
-
-    printf("ii before inner i_s loop\n");
 
     for (
         i_s = 0, i_x_s_arr_p = i_x_s_arr;
@@ -194,11 +189,9 @@ int eval_psi_and_dpsidx_arr(
 
 #endif // DEBUG
 
-    printf("ii before dgesv_\n");
     
     //// Solve linear system for obtaining finite-difference coefficients
     dgesv_(
-//    gesv_(
         &N_s, &b_vec_matrix_col_num, power_matrix_1d, &N_s, 
         pivot_indices, b_vec_matrix_1d, &N_s, &gesv_info
     );
@@ -206,7 +199,6 @@ int eval_psi_and_dpsidx_arr(
       return return_with_mesg("Failed solving for coeffcients");
     }
 
-    printf("ii after dgesv_\n");
 
 #ifdef DEBUG
 
@@ -238,7 +230,7 @@ int eval_psi_and_dpsidx_arr(
           psi_x_s, 
           coef_vec_matrix[0][i_s], 
           coef_vec_matrix[1][i_s], 
-          *psi_p_arr_p, *dpsidx_p_arr_p
+          std::real(*psi_p_arr_p), std::real(*dpsidx_p_arr_p)
       );
 #endif // DEBUG
 
@@ -274,6 +266,7 @@ template int eval_psi_and_dpsidx_arr< std::complex<double> >(
 
 
 
+//// `eval_v_p_arr_for_sph_harm_basis`
 int eval_v_p_arr_for_sph_harm_basis(
     const int N_s, const int N_p, const int N_r_dim, 
     const int N_rho, const int N_lm,
@@ -281,6 +274,7 @@ int eval_v_p_arr_for_sph_harm_basis(
     double *rho_arr, int *l_arr, int *m_arr, const double *rho_p_lim, 
     double **v_p_arr)
 {
+
   //// Function Argument
   //
   // [INPUT]
@@ -322,7 +316,6 @@ int eval_v_p_arr_for_sph_harm_basis(
   std::complex<double> *psi_p_arr = new std::complex<double>[N_p];
   std::complex<double> *dpsidrho_p_arr = new std::complex<double>[N_p];
 
-//  std::complex<double> *denum_p_arr = new std::complex<double>[N_p];
   const size_t type_size = sizeof(std::complex<double>);
   std::complex<double> 
     *denum_p_arr = (std::complex<double> *) std::calloc(N_p, type_size),
@@ -338,27 +331,29 @@ int eval_v_p_arr_for_sph_harm_basis(
 
   int return_code = EXIT_FAILURE;
   
+
   //// Variables to be used in loop
   int i_lm;
   std::complex<double> *psi_arr, **psi_arr_p;
   int *l_p, *m_p;
   std::complex<double> exp_phi, Ylm, Yl1m, psi_p, dpsi_p;
-  double l, m;
-  int li, mi, m_sign;
+  double l, m, m_power_of_minus_1;
+  int li, mi, m_sign, m_abs;
 
   double *theta_p_p, *phi_p_p, rho_p, theta_p, phi_p;
   int i_p;
 
+  bool out_of_range;
+
   std::complex<double> *psi_p_p, *dpsi_p_p;
 
 
-  
-  printf("i before main loopp\n");
+#ifdef DEBUG
   printf("rho_p_arr: \n");
   for (int i_p = 0; i_p < N_p; i_p++) {
     printf("%7.3f",r_p_arr[0][i_p]);
-//    printf("%7.3f",rho_p_arr[i_p]);
   } printf("\n");
+#endif // DEBUG
 
 
   for (
@@ -371,11 +366,13 @@ int eval_v_p_arr_for_sph_harm_basis(
     li = *l_p, mi = *m_p;
     l = (double) li;
     m = (double) mi;
-
+    m_sign = 1 - 2 * (1 - (mi>=0));
+    m_power_of_minus_1 = 1.0 - 2.0 * (mi%2);
+    m_abs = m_sign * mi;
     psi_arr = *psi_arr_p;
 
-    printf("i before eval_psi ... loop\n");
-
+  
+    //// Estimate `psi_p` and `dpsidrho_p` using finite difference
     return_code = eval_psi_and_dpsidx_arr< std::complex<double> >(
         rho_p_arr, psi_arr, rho_arr,
         N_s, N_p, N_rho, rho_p_lim,
@@ -383,13 +380,18 @@ int eval_v_p_arr_for_sph_harm_basis(
     if (return_code != EXIT_SUCCESS) {
       return return_with_mesg("Failed to 'eval_psi_and_dpsidx_arr()'");
     }
-    
+
+
+#ifdef DEBUG
     printf("psi_arr: \n");
     for (int i_p = 0; i_p < N_p; i_p++) {
-      printf("%7.3f%7.3f\n", psi_p_arr[i_p].real(), dpsidrho_p_arr[i_p].real());
+      printf(
+          "%7.3f%7.3f\n", 
+          psi_p_arr[i_p].real(), dpsidrho_p_arr[i_p].real());
     } printf("\n");
-    printf("i before inner loop\n");
-    
+#endif // DEBUG
+
+
     for (
         i_p = 0, theta_p_p = theta_p_arr, phi_p_p = phi_p_arr,
         psi_p_p = psi_p_arr, dpsi_p_p = dpsidrho_p_arr;
@@ -398,27 +400,25 @@ int eval_v_p_arr_for_sph_harm_basis(
         )
     {
 
-      if (rho_p_min > rho_p_arr[i_p] or rho_p_arr[i_p] >= rho_p_max) { continue; }
+      rho_p = rho_p_arr[i_p];
+
+      out_of_range = rho_p_min > rho_p or rho_p >= rho_p_max; 
+      if (out_of_range) { continue; }
 
       theta_p = *theta_p_p, phi_p = *phi_p_p;
       psi_p = *psi_p_p, dpsi_p = *dpsi_p_p;
-      rho_p = rho_p_arr[i_p];
 
       if (rho_p == 0 or sin(theta_p) == 0) {
         return return_with_mesg("Zero 'rho_p' or 'sin(theta_p)' occurred");
       }
 
-      printf("i inside inner loop with li:%d / mi:%d\n",li,mi);
-
-      m_sign = 1 - 2 * (1 - (mi>=0));
-      exp_phi = std::complex<double>(cos(m_sign*m*phi_p), sin(m_sign*m*phi_p));
-      Ylm = gsl_sf_legendre_sphPlm(li, m_sign*mi, cos(theta_p)) * exp_phi;
-      Yl1m = gsl_sf_legendre_sphPlm(li+1, m_sign*mi, cos(theta_p)) * exp_phi;
+      exp_phi = std::complex<double>(cos(m_abs*phi_p), sin(m_abs*phi_p));
+      Ylm = gsl_sf_legendre_sphPlm(li, m_abs, cos(theta_p)) * exp_phi;
+      Yl1m = gsl_sf_legendre_sphPlm(li+1, m_abs, cos(theta_p)) * exp_phi;
       if (mi < 0) {
-        Ylm = (1.0 - 2.0 * (mi%2)) * std::conj(Ylm);
-        Yl1m = (1.0 - 2.0 * (mi%2)) * std::conj(Yl1m);
+        Ylm = m_power_of_minus_1 * std::conj(Ylm);
+        Yl1m = m_power_of_minus_1 * std::conj(Yl1m);
       }
-      printf("Ylm(l=%d,m=%d)==(%.3f,%.3f)\n",li,mi,Ylm.real(),Ylm.imag());
 
       denum_p_arr[i_p] += psi_p * Ylm;
       numer_p_rho_arr[i_p] += dpsi_p * Ylm;
@@ -432,59 +432,82 @@ int eval_v_p_arr_for_sph_harm_basis(
 
   } // i_lm
 
-  printf("i after main loop\n");
 
 
-//  double **r_p_arr_p, **r_p_arr_p_max = r_p_arr + N_p, *r_p;
-//  double **v_p_arr_p, *v_p;
-  
+#ifdef DEBUG
+
+
+  //// Print real part
   printf("real part: \n");
-  printf("%15s%15s%15s%15s\n", "denum","numer_p_rho","numer_p_theta","numer_p_phi");
+  printf(
+      "%15s%15s%15s%15s\n", 
+      "denum","numer_p_rho","numer_p_theta","numer_p_phi");
+
   for (int i_p = 0; i_p < N_p; i_p++) {
     printf("%15.7f%15.7f%15.7f%15.7f\n",
-        denum_p_arr[i_p].real(),numer_p_rho_arr[i_p].real(),numer_p_theta_arr[i_p].real(),numer_p_phi_arr[i_p].real()); 
+        std::real(denum_p_arr[i_p]), std::real(numer_p_rho_arr[i_p]),
+        std::real(numer_p_theta_arr[i_p]), std::real(numer_p_phi_arr[i_p]));
   } printf("\n");
 
+
+  //// Print imaginary part
   printf("imag part: \n");
-  printf("%15s%15s%15s%15s\n", "denum","numer_p_rho","numer_p_theta","numer_p_phi");
+  printf(
+      "%15s%15s%15s%15s\n", 
+      "denum","numer_p_rho","numer_p_theta","numer_p_phi");
+
   for (int i_p = 0; i_p < N_p; i_p++) {
     printf("%15.7f%15.7f%15.7f%15.7f\n",
-        denum_p_arr[i_p].imag(),numer_p_rho_arr[i_p].imag(),numer_p_theta_arr[i_p].imag(),numer_p_phi_arr[i_p].imag()); 
+        std::imag(denum_p_arr[i_p]), std::imag(numer_p_rho_arr[i_p]),
+        std::imag(numer_p_theta_arr[i_p]), std::imag(numer_p_phi_arr[i_p]));
   } printf("\n");
 
 
+#endif // DEBUG
+
+
+
+
+#ifdef DEBUG
   printf("v_p_arr: \n");
-  for (
-      int i_p = 0;
-//      r_p_arr_p = r_p_arr, v_p_arr_p = v_p_arr;
-      i_p < N_p;
-//      r_p_arr_p < r_p_arr_p_max;
-      i_p++
-//      r_p_arr_p++, v_p_arr_p++
-      )
+#endif // DEBUG
+
+  for (int i_p = 0; i_p < N_p; i_p++)
   {
-
-    if (rho_p_min > rho_p_arr[i_p] or rho_p_arr[i_p] >= rho_p_max) {
-      v_p_arr[0][i_p] = 0.0;
-      v_p_arr[1][i_p] = 0.0;
-      v_p_arr[2][i_p] = 0.0;
-    } else {
-      v_p_arr[0][i_p] = (numer_p_rho_arr[i_p] / denum_p_arr[i_p]).imag();
-      v_p_arr[1][i_p] = (numer_p_theta_arr[i_p] / denum_p_arr[i_p]).imag()
-        / (rho_p_arr[i_p]);
-      v_p_arr[2][i_p] = (numer_p_phi_arr[i_p] / denum_p_arr[i_p]).real()
-        / (rho_p_arr[i_p] * sin(theta_p_arr[i_p]));
+    
+    //// Check singularity
+    if (denum_p_arr[i_p] == 0.0) { 
+      return return_with_mesg("Zero 'psi_p' occurred"); 
     }
-//    r_p = *r_p_arr_p;
-//    v_p = *v_p_arr_p;
 
+    //// Velocity evaluation
+    out_of_range = rho_p_min > rho_p_arr[i_p] or rho_p_arr[i_p] >= rho_p_max;
+    if (out_of_range) {
+
+      for (int i_r_dim = 0; i_r_dim < N_r_dim; i_r_dim++) {
+        v_p_arr[i_r_dim][i_p] = 0.0;
+      }
+    } 
+    else {
+
+      v_p_arr[0][i_p] 
+        = (numer_p_rho_arr[i_p] / denum_p_arr[i_p]).imag();
+
+      v_p_arr[1][i_p] 
+        = (numer_p_theta_arr[i_p] / denum_p_arr[i_p]).imag()
+        / (rho_p_arr[i_p]);
+
+      v_p_arr[2][i_p] 
+        = (numer_p_phi_arr[i_p] / denum_p_arr[i_p]).real()
+        / (rho_p_arr[i_p] * sin(theta_p_arr[i_p]));
+
+    }
+
+#ifdef DEBUG
     printf("%5d%15.5f%15.5f%15.5f\n", 
         i_p, 
-        v_p_arr[0][i_p], v_p_arr[1][i_p], v_p_arr[2][i_p]
-        );
-  //    printf("%5d%15.5f%15.5f%15.5f%15.5f\n", 
-  //        i_p, psi_p_arr[i_p].real(), psi_p_ana_arr[i_p].real(), 
-  //        dpsidx_p_arr[i_p].real(), dpsidx_p_ana_arr[i_p].real());
+        v_p_arr[0][i_p], v_p_arr[1][i_p], v_p_arr[2][i_p]);
+#endif // DEBUG
 
   }
 
