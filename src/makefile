@@ -7,10 +7,10 @@ DEBUG_FLAGS = #-DDEBUG
 
 all: install
 
-install: libcbohm.so
-	mkdir -p $(LIB_DIR) && mv $^ $(LIB_DIR)
+install: $(LIB_DIR)/libcbohm.so
 
-libcbohm.so: velocity.o log.o lapack.o
+$(LIB_DIR)/libcbohm.so: velocity.o log.o lapack.o
+	mkdir -p $(LIB_DIR)
 	$(CXX) -shared -fPIC $^ -o $@ $(LAPACK_LIB_FLAGS)
 
 velocity.o: velocity.cc

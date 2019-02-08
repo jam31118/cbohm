@@ -5,10 +5,10 @@ LIB_FLAGS = -L$(LIB_DIR) -lcbohm
 
 all: main
 
-main: main.cc libcbohm.so
+main: main.cc $(LIB_DIR)/libcbohm.so
 	$(CXX) -o $@ $< $(LIB_FLAGS)
 
-libcbohm.so:
+$(LIB_DIR)/libcbohm.so:
 	+$(MAKE) -C ../../src
 
 clean:
