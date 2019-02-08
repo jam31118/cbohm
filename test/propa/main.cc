@@ -9,12 +9,6 @@
 
 typedef std::complex<double> m_t;
 
-void print_bar() {
-  printf("\n----------------------\n\n");
-}
-
-
-
 int main(int argc, char *argv[]) {
 
   //// Configuration
@@ -31,7 +25,6 @@ int main(int argc, char *argv[]) {
   for (int i_t = 0; i_t < N_t; i_t++) {
     t_arr[i_t] = t_0 + i_t * delta_t;
   }
-//  const int N_t_step = N_t - 1;
 
   int N_lm;
   if ( eval_N_lm(qprop_dim, N_l, &N_lm) != EXIT_SUCCESS) 
@@ -112,14 +105,6 @@ int main(int argc, char *argv[]) {
   // `r_p_t0_arr`
   std::copy(r_p_arr_1d,r_p_arr_1d+r_p_arr_size,r_p_t0_arr_1d);
 
-
-//  for(r_p_p = r_p_arr_1d, r_p_t_p = r_p_t_arr_1d + 0 * r_p_arr_size;
-//      r_p_p < r_p_p_max;
-//      r_p_p++, r_p_t_p++) 
-//  {
-//    *r_p_t_p = *
-//  }
-
   // Construct radial coordinate grid points `rho_arr`
   const double delta_rho = (rho_max - 0) / (N_rho);
   double rho_lim[2] = { delta_rho, rho_max };
@@ -184,12 +169,6 @@ int main(int argc, char *argv[]) {
       *r_p_p += _delta_t * (*v_p_p);
     }
 
-//    for (int i_r_dim = 0; i_r_dim < N_r_dim; i_r_dim++) {
-//      for (int i_p = 0; i_p < N_p; i_p++) {
-//        r_p_arr[i_r_dim][i_p] += _delta_t * v_p_arr[i_r_dim][i_p];
-//      }
-//    }
-
     return_code = propa_psi_arr(
         psi_arr, _delta_t, N_rho, N_lm, qprop_dim, initial_m);
     if (return_code != EXIT_SUCCESS) {
@@ -198,18 +177,13 @@ int main(int argc, char *argv[]) {
     
     //// Evaluate velocity vector for each particle
     return_code = eval_v_p_arr_for_sph_harm_basis(
-        N_s, N_p, N_r_dim, 
-        N_rho, N_lm,
-        r_p_arr, psi_arr, 
-        rho_arr, l_arr, m_arr, rho_p_lim, 
-        v_p_arr);
-  
+        N_s, N_p, N_r_dim, N_rho, N_lm, r_p_arr, psi_arr, 
+        rho_arr, l_arr, m_arr, rho_p_lim, v_p_arr);
     if (return_code != EXIT_SUCCESS) {
-      fprintf(stderr, "[ERROR] Failed to run 'eval_psi_and_dpsidx_arr()'");
-      return return_code;
+      return return_with_mesg("Failed to run 'eval_psi_and_dpsidx_arr()");
     }
 
-
+    //// Store `r_p_arr` and `v_p_arr`
     std::copy(
         r_p_arr_1d, r_p_arr_1d + r_p_arr_size,
         r_p_t_arr_1d + (i_t) * r_p_arr_size);
@@ -259,17 +233,11 @@ int main(int argc, char *argv[]) {
   print_bar();
 
   printf("r_p_t0_arr: \n");
-  for (int i_p = 0; i_p < N_p; i_p++) {
-    for (int i_r_dim = 0; i_r_dim < N_r_dim; i_r_dim++) {
-      printf("%7.3f",r_p_t0_arr_1d[i_r_dim*N_p+i_p]);
-    } printf("\n");
-  }
-
+  print_3vec_p_arr(r_p_t0_arr_1d,N_p,N_r_dim);
 
   print_bar();
 
   // Print 'v_p' and its analytical counterpart
-  printf("real part: \n");
   printf(
       "%5s%15s%45s\n", 
       "i_p", "v_p", "v_p_ana");
@@ -284,21 +252,17 @@ int main(int argc, char *argv[]) {
 
   print_bar();
 
+  printf("r_p_t_arr: \n");
   for (int i_t = 0; i_t < N_t; i_t++) {
-    for (int i_p = 0; i_p < N_p; i_p++) {
-      for (int i_r_dim = 0; i_r_dim < N_r_dim; i_r_dim++) {
-        printf("%15.8f",r_p_t_arr[i_t][i_r_dim*N_p+i_p]);
-      } printf("\n");
-    } printf("\n");
-  } printf("\n\n");
+    print_3vec_p_arr(r_p_t_arr[i_t],N_p,N_r_dim);
+    printf("\n");
+  } 
 
+  printf("v_p_t_arr: \n");
   for (int i_t = 0; i_t < N_t; i_t++) {
-    for (int i_p = 0; i_p < N_p; i_p++) {
-      for (int i_r_dim = 0; i_r_dim < N_r_dim; i_r_dim++) {
-        printf("%15.8f",v_p_t_arr[i_t][i_r_dim*N_p+i_p]);
-      } printf("\n");
-    } printf("\n");
-  } printf("\n\n");
+    print_3vec_p_arr(v_p_t_arr[i_t],N_p,N_r_dim);
+    printf("\n");
+  } 
   
 
   // Deallocate memory for arrays
