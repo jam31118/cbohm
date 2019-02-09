@@ -485,7 +485,6 @@ int eval_v_p_arr_for_sph_harm_basis(
     if (out_of_range) {
 
       for (int i_r_dim = 0; i_r_dim < N_r_dim; i_r_dim++) {
-        printf("v_p_arr[i_r_dim][i_p] = %5.4f",v_p_arr[0][i_r_dim * N_p + i_p]);
         v_p_arr[i_r_dim][i_p] = 0.0;
       }
     } 

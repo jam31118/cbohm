@@ -157,7 +157,7 @@ int main(int argc, char *argv[]) {
 
   const int N_st = 4;
 
-  double A[N_st][N_st] = { {0,0,0,0},{0.5,0,0,0},{0,0.5,0,0,},{0,0,1,0}};
+  double A[N_st][N_st] = { {0,0,0,0},{0.5,0,0,0},{0,0.5,0,0,},{0,0,1,0} };
   const double c[N_st] = {0.0, 0.5, 0.5, 1.0};
   const double b[N_st] = {1.0/6.0,1.0/3.0,1.0/3.0,1.0/6.0};
   
@@ -179,64 +179,41 @@ int main(int argc, char *argv[]) {
   }
   
   double *k_p; // *k_p_max;
-  double *pa, *pa_max;
   double a_i_k;
   int i_st, i_k;
  
-  printf("before propagation\n");
 
-//  printf("dddd%7.3f\n",k_st_arr[0][0][0]);
 
   double _delta_t, _delta_inner_t; // _inner_t
   for (int i_t = 1; i_t < N_t; i_t++) {
 
     _delta_t = t_arr[i_t] - t_arr[i_t-1];
-//    _inner_t = 0.0;
-
 
     //// Eval k1 (assuming v_p_arr is already k1, provided c[0] == 0)
     i_st = 0;
     std::copy(v_p_arr_1d, v_p_arr_1d + r_p_arr_size, k_st_arr[i_st][0]);
 
-    printf("propagation k_%d\n",i_st);
 
-
-//// loop starts
-
-
-    //// Eval k2
     for (i_st = 1; i_st < N_st; i_st++) {
-
-      printf("[ LOG ] propagation k_%d at start\n",i_st);
     
       _delta_inner_t = c[i_st-1] - c[i_st];
 
       // Eval y_i_st
       std::copy(r_p_arr_1d, r_p_arr_1d + r_p_arr_size, r_p_i_st_arr_1d);
-      for(pa = A[i_st], i_k=0, pa_max = pa + i_st; 
-          pa < pa_max; pa++, i_k++) {
-          a_i_k = *pa;
-          printf("[ LOG ] a_i_k = %.3f / i_k = %d\n",a_i_k,i_k);
+      for (i_k=0; i_k < i_st; i_k++) 
+      {
+        a_i_k = A[i_st][i_k];
 
-  printf("[ LOG ][i_k=%d] k_st_arr[%d]: \n", i_k, i_k);
-  print_3vec_p_arr(k_st_arr[i_k][0],N_p,N_r_dim);
-  printf("\n");
-
-        for(r_p_p = r_p_i_st_arr_1d, r_p_p_max = r_p_i_st_arr_1d + r_p_arr_size, 
+        for(r_p_p = r_p_i_st_arr_1d, 
+            r_p_p_max = r_p_i_st_arr_1d + r_p_arr_size, 
             k_p = k_st_arr[i_k][0]; 
-            r_p_p < r_p_p_max; r_p_p++, k_p++) {
-          printf("[ LOG ][0][i_st=%d|i_k=%d] a_i_k * *k_p = %.4f || *r_p_p = %.4f\n",i_st,i_k,a_i_k * *k_p, *r_p_p);
+            r_p_p < r_p_p_max; r_p_p++, k_p++) 
+        {
           *r_p_p += a_i_k * *k_p;
-          printf("[ LOG ][1][i_st=%d|i_k=%d] a_i_k * *k_p = %.4f || *r_p_p = %.4f\n",i_st,i_k,a_i_k * *k_p, *r_p_p);
         }
-      }
+
+      } // for-loop : i_k
       
-      printf("[ LOG ] propagation k_%d after y_i_st\n",i_st);
-
-
-  printf("[ LOG ][i_st=%d] r_p_i_st_arr_1d: \n", i_st);
-  print_3vec_p_arr(r_p_i_st_arr_1d,N_p,N_r_dim);
-  printf("\n");
 
       // Eval psi at t_i_st = t_n + c_i_st * _delta_t
       if (_delta_inner_t != 0) {
@@ -247,9 +224,8 @@ int main(int argc, char *argv[]) {
         }
       }
 
-      printf("propagation k_%d after psi\n",i_st);
 
-      // Eval k2
+      // Eval k
       return_code = eval_v_p_arr_for_sph_harm_basis(
           N_s, N_p, N_r_dim, N_rho, N_lm, r_p_i_st_arr, psi_arr, 
           rho_arr, l_arr, m_arr, rho_p_lim, k_st_arr[i_st]);
@@ -257,62 +233,19 @@ int main(int argc, char *argv[]) {
         return return_with_mesg("Failed to run 'eval_psi_and_dpsidx_arr()");
       }
 
-  printf("[ LOG ][i_st=%d] k_st_arr[%d]: \n", i_st, i_st);
-//  printf(":: %7.3f\n",k_st_arr[i_st][0][0]);
-  print_3vec_p_arr(k_st_arr[i_st][0],N_p,N_r_dim);
-  printf("\n");
+    } // for-loop : i_st
 
-    }
-
-
-//    return_code = eval_v_p_arr_for_sph_harm_basis(
-//        N_s, N_p, N_r_dim, N_rho, N_lm, r_p_arr + 0.5 * k2, psi_arr, 
-//        rho_arr, l_arr, m_arr, rho_p_lim, k3);
-//    if (return_code != EXIT_SUCCESS) {
-//      return return_with_mesg("Failed to run 'eval_psi_and_dpsidx_arr()");
-//    }
-//
-//    return_code = propa_psi_arr(
-//        psi_arr, 0.5 * _delta_t, N_rho, N_lm, qprop_dim, initial_m);
-//    if (return_code != EXIT_SUCCESS) {
-//      return return_with_mesg("Failed during propagation of 'psi_arr'");
-//    }
-//
-//    return_code = eval_v_p_arr_for_sph_harm_basis(
-//        N_s, N_p, N_r_dim, N_rho, N_lm, r_p_arr + 1.0 * k3, psi_arr, 
-//        rho_arr, l_arr, m_arr, rho_p_lim, k4);
-//    if (return_code != EXIT_SUCCESS) {
-//      return return_with_mesg("Failed to run 'eval_psi_and_dpsidx_arr()");
-//    }
 
     for (i_st = 0; i_st < N_st; i_st++) {
-      for(r_p_p = r_p_arr_1d, r_p_p_max = r_p_arr_1d + r_p_arr_size, 
+      for(r_p_p = r_p_arr_1d, 
+          r_p_p_max = r_p_arr_1d + r_p_arr_size, 
           k_p = k_st_arr[i_st][0]; 
-          r_p_p < r_p_p_max; r_p_p++, k_p++) {
+          r_p_p < r_p_p_max; r_p_p++, k_p++) 
+      {
         *r_p_p += _delta_t * b[i_st] * *k_p;
-//        for(pa = A[i_st], k_p=k_st_arr[i_st], 
-//            k_p_max = k_st_arr[i_st]+r_p_arr_size; 
-//            k_p<k_p_max; pa++, k_p++) {
-//          *r_p_p += *pa * *k_p;
-//        }
       }
-    }
+    } // for-loop : i_st
 
-//    for (
-//        r_p_p=r_p_arr_1d, v_p_p=v_p_arr_1d,
-//        r_p_p_max = r_p_arr_1d + N_r_dim * N_p;
-//        r_p_p<r_p_p_max; 
-//        r_p_p++, v_p_p++)
-//    {
-//      *r_p_p += _delta_t * 1.0 / 6.0 * (k1 + 2.0*k2 + 2.0*k3 + k4);
-//    }
-
-//    return_code = propa_psi_arr(
-//        psi_arr, _delta_t, N_rho, N_lm, qprop_dim, initial_m);
-//    if (return_code != EXIT_SUCCESS) {
-//      return return_with_mesg("Failed during propagation of 'psi_arr'");
-//    }
-    
     //// Evaluate velocity vector for each particle
     return_code = eval_v_p_arr_for_sph_harm_basis(
         N_s, N_p, N_r_dim, N_rho, N_lm, r_p_arr, psi_arr, 
@@ -329,14 +262,13 @@ int main(int argc, char *argv[]) {
         v_p_arr_1d, v_p_arr_1d + r_p_arr_size,
         v_p_t_arr_1d + (i_t) * r_p_arr_size);
 
-  }
+  } // for-loop : i_t
 
   delete [] k_st_arr_1d;
   delete [] k_st_arr_2d;
   delete [] k_st_arr;
   delete [] r_p_i_st_arr_1d;
   delete [] r_p_i_st_arr;
-
 
 
 
