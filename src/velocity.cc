@@ -38,31 +38,15 @@ int eval_shift_offset(
 }
 
 
+
 template <typename T>
-int eval_psi_and_dpsidx_arr(
-    double *x_p_arr, T *psi_arr, double *x_arr, 
-    int N_s, int N_p, int N_x, const double *x_p_lim, 
-    T *psi_p_arr, T *dpsidx_p_arr) {
-
-  //// Function Arguments
-  //
-  // `N_s`: the number of stencils used for finite difference expression
-  // `N_p`: the number of particles
-  // `N_x`: the number of spatial grid points 
-  //        on which a state function `psi_arr` is defined
-  // `x_p_arr`: an array of positions of particles of length `N_p`
-  // `psi_arr`: an array of state function of length `N_x`
-  // `x_arr`: an array of spatial grid points of length `N_x`
-
-
-  //// Check function arguments
-  assert(N_s > 0 and N_p > 0 and N_x > N_s);
-
+int eval_psi_and_dpsidx_p(
+    const double x_p, T *psi_arr, const double *x_arr, 
+    const int N_s, const int N_x, const double *x_p_lim, 
+    T *psi_p_arr_p, T *dpsidx_p_arr_p) {
 
   //// Define some useful variables
   const double delta_x = x_arr[1] - x_arr[0];
-//  const int i_x_max = N_x - 1;
-
   
   //// Aliasing
   const int num_of_stencils = N_s;
@@ -105,9 +89,9 @@ int eval_psi_and_dpsidx_arr(
   const int index_of_nearest_left_stencil = (num_of_stencils / 2) - 1;
   const int i_nlp = index_of_nearest_left_stencil; // aliasing
 
-  double *x_p_arr_p, *x_p_arr_p_max = x_p_arr + N_p;
-  T *psi_p_arr_p, *dpsidx_p_arr_p;
-  double x_p;
+//  double *x_p_arr_p, *x_p_arr_p_max = x_p_arr + N_p;
+//  double x_p;
+//  T *psi_p_arr_p, *dpsidx_p_arr_p;
 
   int i_x_s_arr[num_of_stencils];
   int i_s, *i_x_s_arr_p, *i_x_s_arr_p_max = i_x_s_arr + N_s;
@@ -140,117 +124,351 @@ int eval_psi_and_dpsidx_arr(
   T psi_x_s;
 
 
+//  for (
+//      x_p_arr_p = x_p_arr, 
+//      psi_p_arr_p = psi_p_arr, dpsidx_p_arr_p = dpsidx_p_arr;
+//      x_p_arr_p < x_p_arr_p_max; 
+//      ++x_p_arr_p, ++psi_p_arr_p, ++dpsidx_p_arr_p
+//      )
+//  {
+
+  //// Evaluate `x_p` for preventing repetitive dereferencing 
+//  x_p = *x_p_arr_p;
+
+  //// Check in-range
+  if (x_p_lim[0] > x_p or x_p >= x_p_lim[1]) { return OUT_OF_RANGE; }
+
+  //// Evaluate the index of grid point of nearest left stencil
+  i_x_s_at_nls = (x_p - x_arr[0]) / delta_x;
+
+  //// Evaluate shift offset for stencils
+  if (eval_shift_offset(N_s,i_x_s_at_nls,N_x,&shift_offset) != EXIT_SUCCESS)
+  { return debug_mesg("Failed to evaluate 'shift_offset'"); }
+
+
+  for (
+      i_s = 0, i_x_s_arr_p = i_x_s_arr;
+      i_x_s_arr_p < i_x_s_arr_p_max;
+      ++i_x_s_arr_p, ++i_s
+      ) 
+  {
+    *i_x_s_arr_p = i_x_s_at_nls + (i_s - i_nlp) + shift_offset; 
+    
+    // Construct the power matrix - in column major for FORTRAN LAPACK
+    power_matrix[i_s][0] = 1.0; 
+    delta_x_s = x_arr[*i_x_s_arr_p] - x_p;
+    for (int i_row = 1; i_row < N_s; ++i_row) {
+      power_matrix[i_s][i_row] = power_matrix[i_s][i_row-1] * delta_x_s;
+    }
+
+  } // for-loop `i_s`
+
+
+  b_vec_matrix[0][0] = 1.0; // for psi
+  b_vec_matrix[1][1] = 1.0; // for dpsidx
+
+ 
+#ifdef DEBUG
+  printf("x_p = %7.3f\n",x_p);
+  for (int i_row = 0; i_row < N_s; i_row++) {
+    printf("%7.3f",x_arr[i_x_s_arr[i_row]]);
+    for (int i_col = 0; i_col < N_s; i_col++) {
+      printf("%7.3f", power_matrix[i_col][i_row]); 
+    } printf("%7.3f%7.3f", b_vec_matrix[0][i_row], b_vec_matrix[1][i_row]);
+    printf("\n");
+  }
+
+  printf("power_matrix_1d: ");
+  for (int i=0; i < N_s*N_s; i++) {
+    printf("%7.3f", power_matrix_1d[i]);
+  } printf("\n");
+  printf("b_vec_matrix_1d: ");
+  for (int i=0; i < N_s*b_vec_matrix_col_num; i++) {
+    printf("%7.3f", b_vec_matrix_1d[i]);
+  } printf("\n");
+
+#endif // DEBUG
+
+
+  //// Solve linear system for obtaining finite-difference coefficients
+  dgesv_(
+      &N_s, &b_vec_matrix_col_num, power_matrix_1d, &N_s, 
+      pivot_indices, b_vec_matrix_1d, &N_s, &gesv_info
+  );
+  if ( handle_gesv_info(gesv_info) != EXIT_SUCCESS) 
+  { return return_with_mesg("Failed solving for coeffcients"); }
+
+
+#ifdef DEBUG
+
+  printf("power_matrix_1d: ");
+  for (int i=0; i < N_s*N_s; i++) {
+    printf("%7.3f", power_matrix_1d[i]);
+  } printf("\n");
+  printf("coef_vec_matrix: ");
+  for (int i=0; i < N_s*b_vec_matrix_col_num; i++) {
+    printf("%7.3f", coef_vec_matrix[0][i]);
+  } printf("\n");
+
+#endif // DEBUG
+  
+
+  //// Evaluate the finite-difference-approximated values: psi, dpsidx
+  *psi_p_arr_p = 0, *dpsidx_p_arr_p = 0;
+  for (int i_s = 0; i_s < N_s; i_s++) {
+    psi_x_s = psi_arr[i_x_s_arr[i_s]];
+    *psi_p_arr_p += coef_vec_matrix[0][i_s] * psi_x_s;
+    *dpsidx_p_arr_p += coef_vec_matrix[1][i_s] * psi_x_s;
+
+
+#ifdef DEBUG
+    printf(
+        "psi_x_s: %7.3f,"
+        " coef_vec_matrix[0][i_s]: %7.3f,"
+        " coef_vec_matrix[1][i_s]: %7.3f,"
+        " *psi_p_arr_p: %7.3f, *dpsidx_p_arr_p: %7.3f\n",
+        std::real(psi_x_s), 
+        coef_vec_matrix[0][i_s], 
+        coef_vec_matrix[1][i_s], 
+        std::real(*psi_p_arr_p), std::real(*dpsidx_p_arr_p)
+    );
+#endif // DEBUG
+
+  }
+
+//  } // for-loop `x_p_arr_p`
+
+
+  return EXIT_SUCCESS;
+}
+
+
+
+template <typename T>
+int eval_psi_and_dpsidx_arr(
+    const double *x_p_arr, T *psi_arr, const double *x_arr, 
+    const int N_s, const int N_p, const int N_x, const double *x_p_lim, 
+    T *psi_p_arr, T *dpsidx_p_arr) {
+
+  //// Function Arguments
+  //
+  // `N_s`: the number of stencils used for finite difference expression
+  // `N_p`: the number of particles
+  // `N_x`: the number of spatial grid points 
+  //        on which a state function `psi_arr` is defined
+  // `x_p_arr`: an array of positions of particles of length `N_p`
+  // `psi_arr`: an array of state function of length `N_x`
+  // `x_arr`: an array of spatial grid points of length `N_x`
+
+
+  //// Check function arguments
+  assert(N_s > 0 and N_p > 0 and N_x > N_s);
+
+
+//  //// Define some useful variables
+//  const double delta_x = x_arr[1] - x_arr[0];
+////  const int i_x_max = N_x - 1;
+//
+//  
+//  //// Aliasing
+//  const int num_of_stencils = N_s;
+
+
+  //// Explanation on stencil system
+  //
+  // Consider a case where four stencils are used for each finite
+  // difference approximation, denoting each stencil with 'O'
+  // in the following figure:
+  //
+  //  [ ]  [i_x_0][i_x_1][i_x_2][i_x_3]  [ ]    [ ]   (spatial grid indice)
+  //   .      .      .      .      .      .      .    (spatial grid points)
+  //         [0]    [1]    [2]    [3]                 (stencil indice)
+  //          O      O      O      O                  (stencils)
+  //                   X                              (particle position)
+  //
+  // where the numbers in parentheses `[]` on the third line 
+  // refer to the index of each stencil, 
+  // `X` denotes the position of the particle,
+  // and several '.' represent the spatial grid points,
+  // identified by index `i_x`. The `i_x_s` with `s=0,1,...,N_s-1`
+  // denotes the index of spatial grid points where the stencils are placed.
+  // 
+  // The `index_of_nearest_left_stencil` is the index of 
+  // the nearest-left stencil ('nls'), which is `1` in this case.
+  // Using an alias, the following is true: `i_nls == 1`,
+  // and thus, the spatial index at the nearest-left-stencil,
+  // denoted by `i_x_at_nls` is `i_x_1` in this case.
+  // 
+  // The `N_s_on_left` is the number of stencils on the left
+  // of the nearest-left-stencil, and there is one stencil, `[0]`
+  // in this case.
+  // 
+  // The `N_s_on_right` is the number of stencils on the right
+  // of the nearest-left-stencil, and there are two: `[2]` and `[3]`
+  // in this case.
+
+  const double *x_p_arr_p, *x_p_arr_p_max = x_p_arr + N_p;
+  T *psi_p_arr_p, *dpsidx_p_arr_p;
+  
+  int return_code = EXIT_FAILURE;
+
+//  double x_p;
+
+//g  const int index_of_nearest_left_stencil = (num_of_stencils / 2) - 1;
+//g  const int i_nlp = index_of_nearest_left_stencil; // aliasing
+//g
+//g  T *psi_p_arr_p, *dpsidx_p_arr_p;
+//g
+//g  int i_x_s_arr[num_of_stencils];
+//g  int i_s, *i_x_s_arr_p, *i_x_s_arr_p_max = i_x_s_arr + N_s;
+//g  int i_x_s_at_nls;
+//g
+//g  int shift_offset;
+//g
+//g  double power_matrix[num_of_stencils][num_of_stencils];
+//g  double *power_matrix_1d = power_matrix[0];
+//g
+//g  int b_vec_matrix_col_num = 2; // for psi and dpsidx respectively.
+//g  double *b_vec_matrix[b_vec_matrix_col_num];
+//g  double b_vec_matrix_1d[b_vec_matrix_col_num * num_of_stencils];
+//g  for (int i_col = 0; i_col < b_vec_matrix_col_num; i_col++)
+//g  { b_vec_matrix[i_col] = b_vec_matrix_1d + i_col * num_of_stencils; }
+//g  std::memset(b_vec_matrix_1d, 0, sizeof(b_vec_matrix_1d));
+//g
+//g  // An alias for `b_vec_matrix`
+//g  // Note that the `b_vec_matrix` holds the coefficients after gesv() routine
+//g  // This `coef_vec_matrix` will be used after the gesv() routine.
+//g  double **coef_vec_matrix = b_vec_matrix;
+//g  
+//g  double delta_x_s;
+//g
+//g  // The pivot indices that define the permutation matrix P;
+//g  // row i of the matrix was interchanged with row IPIV(i).
+//g  int pivot_indices[num_of_stencils];
+//g  int gesv_info;
+//g
+//g  T psi_x_s;
+
+
   for (
       x_p_arr_p = x_p_arr, 
       psi_p_arr_p = psi_p_arr, dpsidx_p_arr_p = dpsidx_p_arr;
       x_p_arr_p < x_p_arr_p_max; 
       ++x_p_arr_p, ++psi_p_arr_p, ++dpsidx_p_arr_p
       )
+//  for (x_p_arr_p = x_p_arr; x_p_arr_p < x_p_arr_p_max; ++x_p_arr_p)
   {
 
-    //// Evaluate `x_p` for preventing repetitive dereferencing 
-    x_p = *x_p_arr_p;
-
-    //// Check in-range
-    if (x_p_lim[0] > x_p or x_p >= x_p_lim[1]) { continue; }
-  
-    //// Evaluate the index of grid point of nearest left stencil
-    i_x_s_at_nls = (x_p - x_arr[0]) / delta_x;
-
-    //// Evaluate shift offset for stencils
-    if (eval_shift_offset(N_s,i_x_s_at_nls,N_x,&shift_offset) != EXIT_SUCCESS)
-    { return debug_mesg("Failed to evaluate 'shift_offset'"); }
-
-
-    for (
-        i_s = 0, i_x_s_arr_p = i_x_s_arr;
-        i_x_s_arr_p < i_x_s_arr_p_max;
-        ++i_x_s_arr_p, ++i_s
-        ) 
-    {
-      *i_x_s_arr_p = i_x_s_at_nls + (i_s - i_nlp) + shift_offset; 
-      
-      // Construct the power matrix - in column major for FORTRAN LAPACK
-      power_matrix[i_s][0] = 1.0; 
-      delta_x_s = x_arr[*i_x_s_arr_p] - x_p;
-      for (int i_row = 1; i_row < N_s; ++i_row) {
-        power_matrix[i_s][i_row] = power_matrix[i_s][i_row-1] * delta_x_s;
-      }
-
-    } // for-loop `i_s`
-
-
-    b_vec_matrix[0][0] = 1.0; // for psi
-    b_vec_matrix[1][1] = 1.0; // for dpsidx
-
- 
-#ifdef DEBUG
-    printf("x_p = %7.3f\n",x_p);
-    for (int i_row = 0; i_row < N_s; i_row++) {
-      printf("%7.3f",x_arr[i_x_s_arr[i_row]]);
-      for (int i_col = 0; i_col < N_s; i_col++) {
-        printf("%7.3f", power_matrix[i_col][i_row]); 
-      } printf("%7.3f%7.3f", b_vec_matrix[0][i_row], b_vec_matrix[1][i_row]);
-      printf("\n");
-    }
-
-    printf("power_matrix_1d: ");
-    for (int i=0; i < N_s*N_s; i++) {
-      printf("%7.3f", power_matrix_1d[i]);
-    } printf("\n");
-    printf("b_vec_matrix_1d: ");
-    for (int i=0; i < N_s*b_vec_matrix_col_num; i++) {
-      printf("%7.3f", b_vec_matrix_1d[i]);
-    } printf("\n");
-
-#endif // DEBUG
-
-
-    //// Solve linear system for obtaining finite-difference coefficients
-    dgesv_(
-        &N_s, &b_vec_matrix_col_num, power_matrix_1d, &N_s, 
-        pivot_indices, b_vec_matrix_1d, &N_s, &gesv_info
-    );
-    if ( handle_gesv_info(gesv_info) != EXIT_SUCCESS) 
-    { return return_with_mesg("Failed solving for coeffcients"); }
-
-
-#ifdef DEBUG
-
-    printf("power_matrix_1d: ");
-    for (int i=0; i < N_s*N_s; i++) {
-      printf("%7.3f", power_matrix_1d[i]);
-    } printf("\n");
-    printf("coef_vec_matrix: ");
-    for (int i=0; i < N_s*b_vec_matrix_col_num; i++) {
-      printf("%7.3f", coef_vec_matrix[0][i]);
-    } printf("\n");
-
-#endif // DEBUG
-    
-
-    //// Evaluate the finite-difference-approximated values: psi, dpsidx
-    *psi_p_arr_p = 0, *dpsidx_p_arr_p = 0;
-    for (int i_s = 0; i_s < N_s; i_s++) {
-      psi_x_s = psi_arr[i_x_s_arr[i_s]];
-      *psi_p_arr_p += coef_vec_matrix[0][i_s] * psi_x_s;
-      *dpsidx_p_arr_p += coef_vec_matrix[1][i_s] * psi_x_s;
-
-
-#ifdef DEBUG
-      printf(
-          "psi_x_s: %7.3f,"
-          " coef_vec_matrix[0][i_s]: %7.3f,"
-          " coef_vec_matrix[1][i_s]: %7.3f,"
-          " *psi_p_arr_p: %7.3f, *dpsidx_p_arr_p: %7.3f\n",
-          std::real(psi_x_s), 
-          coef_vec_matrix[0][i_s], 
-          coef_vec_matrix[1][i_s], 
-          std::real(*psi_p_arr_p), std::real(*dpsidx_p_arr_p)
-      );
-#endif // DEBUG
-
-    }
+    return_code = eval_psi_and_dpsidx_p(
+          *x_p_arr_p, psi_arr, x_arr, 
+          N_s, N_x, x_p_lim, 
+          psi_p_arr_p, dpsidx_p_arr_p
+        );
+    if (return_code != EXIT_SUCCESS) 
+    { return debug_mesg("Failed during 'eval_psi_and_dpsidx_p'"); }
+//    //// Evaluate `x_p` for preventing repetitive dereferencing 
+//    x_p = *x_p_arr_p;
+//
+//    //// Check in-range
+//    if (x_p_lim[0] > x_p or x_p >= x_p_lim[1]) { continue; }
+//  
+//    //// Evaluate the index of grid point of nearest left stencil
+//    i_x_s_at_nls = (x_p - x_arr[0]) / delta_x;
+//
+//    //// Evaluate shift offset for stencils
+//    if (eval_shift_offset(N_s,i_x_s_at_nls,N_x,&shift_offset) != EXIT_SUCCESS)
+//    { return debug_mesg("Failed to evaluate 'shift_offset'"); }
+//
+//
+//    for (
+//        i_s = 0, i_x_s_arr_p = i_x_s_arr;
+//        i_x_s_arr_p < i_x_s_arr_p_max;
+//        ++i_x_s_arr_p, ++i_s
+//        ) 
+//    {
+//      *i_x_s_arr_p = i_x_s_at_nls + (i_s - i_nlp) + shift_offset; 
+//      
+//      // Construct the power matrix - in column major for FORTRAN LAPACK
+//      power_matrix[i_s][0] = 1.0; 
+//      delta_x_s = x_arr[*i_x_s_arr_p] - x_p;
+//      for (int i_row = 1; i_row < N_s; ++i_row) {
+//        power_matrix[i_s][i_row] = power_matrix[i_s][i_row-1] * delta_x_s;
+//      }
+//
+//    } // for-loop `i_s`
+//
+//
+//    b_vec_matrix[0][0] = 1.0; // for psi
+//    b_vec_matrix[1][1] = 1.0; // for dpsidx
+//
+// 
+//#ifdef DEBUG
+//    printf("x_p = %7.3f\n",x_p);
+//    for (int i_row = 0; i_row < N_s; i_row++) {
+//      printf("%7.3f",x_arr[i_x_s_arr[i_row]]);
+//      for (int i_col = 0; i_col < N_s; i_col++) {
+//        printf("%7.3f", power_matrix[i_col][i_row]); 
+//      } printf("%7.3f%7.3f", b_vec_matrix[0][i_row], b_vec_matrix[1][i_row]);
+//      printf("\n");
+//    }
+//
+//    printf("power_matrix_1d: ");
+//    for (int i=0; i < N_s*N_s; i++) {
+//      printf("%7.3f", power_matrix_1d[i]);
+//    } printf("\n");
+//    printf("b_vec_matrix_1d: ");
+//    for (int i=0; i < N_s*b_vec_matrix_col_num; i++) {
+//      printf("%7.3f", b_vec_matrix_1d[i]);
+//    } printf("\n");
+//
+//#endif // DEBUG
+//
+//
+//    //// Solve linear system for obtaining finite-difference coefficients
+//    dgesv_(
+//        &N_s, &b_vec_matrix_col_num, power_matrix_1d, &N_s, 
+//        pivot_indices, b_vec_matrix_1d, &N_s, &gesv_info
+//    );
+//    if ( handle_gesv_info(gesv_info) != EXIT_SUCCESS) 
+//    { return return_with_mesg("Failed solving for coeffcients"); }
+//
+//
+//#ifdef DEBUG
+//
+//    printf("power_matrix_1d: ");
+//    for (int i=0; i < N_s*N_s; i++) {
+//      printf("%7.3f", power_matrix_1d[i]);
+//    } printf("\n");
+//    printf("coef_vec_matrix: ");
+//    for (int i=0; i < N_s*b_vec_matrix_col_num; i++) {
+//      printf("%7.3f", coef_vec_matrix[0][i]);
+//    } printf("\n");
+//
+//#endif // DEBUG
+//    
+//
+//    //// Evaluate the finite-difference-approximated values: psi, dpsidx
+//    *psi_p_arr_p = 0, *dpsidx_p_arr_p = 0;
+//    for (int i_s = 0; i_s < N_s; i_s++) {
+//      psi_x_s = psi_arr[i_x_s_arr[i_s]];
+//      *psi_p_arr_p += coef_vec_matrix[0][i_s] * psi_x_s;
+//      *dpsidx_p_arr_p += coef_vec_matrix[1][i_s] * psi_x_s;
+//
+//
+//#ifdef DEBUG
+//      printf(
+//          "psi_x_s: %7.3f,"
+//          " coef_vec_matrix[0][i_s]: %7.3f,"
+//          " coef_vec_matrix[1][i_s]: %7.3f,"
+//          " *psi_p_arr_p: %7.3f, *dpsidx_p_arr_p: %7.3f\n",
+//          std::real(psi_x_s), 
+//          coef_vec_matrix[0][i_s], 
+//          coef_vec_matrix[1][i_s], 
+//          std::real(*psi_p_arr_p), std::real(*dpsidx_p_arr_p)
+//      );
+//#endif // DEBUG
+//
+//    }
   
   } // for-loop `x_p_arr_p`
 
@@ -260,15 +478,29 @@ int eval_psi_and_dpsidx_arr(
 }
 
 
+
 //// Instantiation
+
+// Instantiation of `eval_psi_and_dpsidx_p()` 
+template int eval_psi_and_dpsidx_p<double>(
+    const double x_p, double *psi_arr, const double *x_arr, 
+    const int N_s, const int N_x, const double *x_p_lim, 
+    double *psi_p, double *dpsidx_p);
+
+template int eval_psi_and_dpsidx_p< std::complex<double> >(
+    const double x_p, std::complex<double> *psi_arr, const double *x_arr, 
+    const int N_s, const int N_x, const double *x_p_lim, 
+    std::complex<double> *psi_p, std::complex<double> *dpsidx_p);
+
+// Instantiation of `eval_psi_and_dpsidx_arr()`
 template int eval_psi_and_dpsidx_arr<double>(
-    double *x_p_arr, double *psi_arr, double *x_arr, 
-    int N_s, int N_p, int N_x, const double *x_p_lim, 
+    const double *x_p_arr, double *psi_arr, const double *x_arr, 
+    const int N_s, const int N_p, const int N_x, const double *x_p_lim, 
     double *psi_p_arr, double *dpsidx_p_arr);
 
 template int eval_psi_and_dpsidx_arr< std::complex<double> >(
-    double *x_p_arr, std::complex<double> *psi_arr, double *x_arr, 
-    int N_s, int N_p, int N_x, const double *x_p_lim, 
+    const double *x_p_arr, std::complex<double> *psi_arr, const double *x_arr, 
+    const int N_s, const int N_p, const int N_x, const double *x_p_lim, 
     std::complex<double> *psi_p_arr, std::complex<double> *dpsidx_p_arr);
 
 

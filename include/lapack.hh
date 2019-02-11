@@ -7,8 +7,8 @@
 extern "C" {
 
 extern int dgesv_(
-    int *n, int *nrhs, double *A, int *lda, int *ipiv, double *B, 
-    int *ldb, int *info);
+    const int *n, const int *nrhs, double *A, const int *lda, 
+    const int *ipiv, double *B, const int *ldb, int *info);
 
 }
 
