@@ -1,7 +1,7 @@
 include ../../var.mk
 
 LIB_DIR=../../lib
-LIB_FLAGS = -L$(LIB_DIR) -lcbohm
+LIB_FLAGS = -L$(LIB_DIR) -lcbohm -Wl,--rpath=$(LIB_DIR)
 
 all: main
 
