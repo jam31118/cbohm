@@ -105,9 +105,8 @@ int main(int argc, char *argv[]) {
   int return_code = EXIT_FAILURE;
 
   return_code = eval_v_p_arr_for_sph_harm_basis(
-      N_s, N_p, N_r_dim, 
-      N_rho, N_lm,
-      (double **) r_p_arr, (m_t **) psi_arr, 
+      N_s, N_p, N_rho, N_lm,
+      (double **) r_p_arr, (const m_t **) psi_arr, 
       rho_arr, l_arr, m_arr, rho_p_lim, 
       (double **) v_p_arr);
 

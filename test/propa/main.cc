@@ -138,9 +138,8 @@ int main(int argc, char *argv[]) {
   // `v_p_arr`
  
   return_code = eval_v_p_arr_for_sph_harm_basis(
-      N_s, N_p, N_r_dim, 
-      N_rho, N_lm,
-      r_p_arr, psi_arr, 
+      N_s, N_p, N_rho, N_lm,
+      r_p_arr, (const m_t **) psi_arr, 
       rho_arr, l_arr, m_arr, rho_p_lim, 
       v_p_arr);
 
@@ -227,7 +226,7 @@ int main(int argc, char *argv[]) {
 
       // Eval k
       return_code = eval_v_p_arr_for_sph_harm_basis(
-          N_s, N_p, N_r_dim, N_rho, N_lm, r_p_i_st_arr, psi_arr, 
+          N_s, N_p, N_rho, N_lm, r_p_i_st_arr, (const m_t **) psi_arr, 
           rho_arr, l_arr, m_arr, rho_p_lim, k_st_arr[i_st]);
       if (return_code != EXIT_SUCCESS) {
         return return_with_mesg(
@@ -249,7 +248,7 @@ int main(int argc, char *argv[]) {
 
     //// Evaluate velocity vector for each particle
     return_code = eval_v_p_arr_for_sph_harm_basis(
-        N_s, N_p, N_r_dim, N_rho, N_lm, r_p_arr, psi_arr, 
+        N_s, N_p, N_rho, N_lm, r_p_arr, (const m_t **) psi_arr, 
         rho_arr, l_arr, m_arr, rho_p_lim, v_p_arr);
     if (return_code != EXIT_SUCCESS) {
       return return_with_mesg("Failed to run 'eval_psi_and_dpsidx_arr()");

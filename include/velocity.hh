@@ -14,12 +14,15 @@
 #include <cmath>
 
 #define CODE_OUT_OF_RANGE 256
+#define DIM_R 3
+
 
 template <typename T>
 int eval_psi_and_dpsidx_p(
-    const double x_p, T *psi_arr, const double *x_arr, 
+    const double x_p, const T *psi_arr, const double *x_arr, 
     const int N_s, const int N_x, const double *x_p_lim, 
     T *psi_p_arr_p, T *dpsidx_p_arr_p);
+
 
 template <typename T>
 int eval_psi_and_dpsidx_arr(
@@ -27,11 +30,20 @@ int eval_psi_and_dpsidx_arr(
     const int N_s, const int N_p, const int N_x, const double *x_p_lim, 
     T *psi_p_arr, T *dpsidx_p_arr);
 
+
+int eval_v_p_for_sph_harm_basis(
+    const int N_s, const int N_rho, const int N_lm, 
+    const double r_p_vec[DIM_R], 
+    const std::complex<double> **psi_in_sph_harm_basis_arr,
+    const double *rho_arr, int *l_arr, int *m_arr, const double *rho_p_lim, 
+    double v_p_vec[DIM_R]);
+
+
 int eval_v_p_arr_for_sph_harm_basis(
-    const int N_s, const int N_p, const int N_r_dim, 
-    const int N_rho, const int N_lm,
-    double **r_p_arr, std::complex<double> **psi_in_sph_harm_basis_arr,
+    const int N_s, const int N_p, const int N_rho, const int N_lm,
+    double **r_p_arr, const std::complex<double> **psi_in_sph_harm_basis_arr,
     double *rho_arr, int *l_arr, int *m_arr, const double *rho_p_lim, 
     double **v_p_arr);
+
 
 #endif // _VELOCITY_HH_

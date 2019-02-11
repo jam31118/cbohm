@@ -41,7 +41,7 @@ int eval_shift_offset(
 
 template <typename T>
 int eval_psi_and_dpsidx_p(
-    const double x_p, T *psi_arr, const double *x_arr, 
+    const double x_p, const T *psi_arr, const double *x_arr, 
     const int N_s, const int N_x, const double *x_p_lim, 
     T *psi_p_arr_p, T *dpsidx_p_arr_p) {
 
@@ -281,12 +281,12 @@ int eval_psi_and_dpsidx_arr(
 
 // Instantiation of `eval_psi_and_dpsidx_p()` 
 template int eval_psi_and_dpsidx_p<double>(
-    const double x_p, double *psi_arr, const double *x_arr, 
+    const double x_p, const double *psi_arr, const double *x_arr, 
     const int N_s, const int N_x, const double *x_p_lim, 
     double *psi_p, double *dpsidx_p);
 
 template int eval_psi_and_dpsidx_p< std::complex<double> >(
-    const double x_p, std::complex<double> *psi_arr, const double *x_arr, 
+    const double x_p, const std::complex<double> *psi_arr, const double *x_arr, 
     const int N_s, const int N_x, const double *x_p_lim, 
     std::complex<double> *psi_p, std::complex<double> *dpsidx_p);
 
@@ -303,27 +303,30 @@ template int eval_psi_and_dpsidx_arr< std::complex<double> >(
 
 
 
+
+
+
 //// `eval_v_p_arr_for_sph_harm_basis`
-int eval_v_p_arr_for_sph_harm_basis(
-    const int N_s, const int N_p, const int N_r_dim, 
-    const int N_rho, const int N_lm,
-    double **r_p_arr, std::complex<double> **psi_in_sph_harm_basis_arr,
-    double *rho_arr, int *l_arr, int *m_arr, const double *rho_p_lim, 
-    double **v_p_arr)
+int eval_v_p_for_sph_harm_basis(
+    const int N_s, const int N_rho, const int N_lm, 
+    const double r_p_vec[DIM_R], 
+    const std::complex<double> **psi_in_sph_harm_basis_arr,
+    const double *rho_arr, int *l_arr, int *m_arr, const double *rho_p_lim, 
+    double v_p_vec[DIM_R])
 {
 
   //// Function Argument
   //
-  // [INPUT]
+  // [NOTE]
+  // `DIM_R` : the dimension of paritlce's position vector space
   //
+  // [INPUT]
   // `N_s` : the number of stencils used in finite-difference approximation
   //         for estimating psi and dpsidrho at particle's radial coodinate
-  // `N_p` : the number of particles
-  // `N_r_dim` : the dimension of paritlce's position vector space
   // `N_rho` : the number of radial grid points
   // `N_lm` : the number of spherical harmonics basis
   //
-  // `r_p_arr` : 2D array of shape (`N_r_dim`,`N_p`)
+  // `r_p_vec` : 1D array of shape (`DIM_R`,)
   // `psi_in_sph_harm_basis_arr` : 2D array of shape (`N_lm`,`N_rho`)
   // `rho_arr` : 1D array of shape (`N_rho`,)
   // `l_arr` : 1D array of shape (`l_arr`,)
@@ -331,58 +334,60 @@ int eval_v_p_arr_for_sph_harm_basis(
   // `rho_p_lim` : 1D array of shape (2,)
   //
   // [OUTPUT]
+  // `v_p_vec` : 1D array of shape (`DIM_R`,)
   //
-  // `v_p_arr` : 2D array of shape (`N_r_dim`,`N_p`)
-  //
-
 
   //// Check arguments
-  assert(N_s > 0 and N_p > 0 and N_r_dim > 0 and N_rho > N_s and N_lm > 0);
-
+  if ( !(N_s > 0 and N_rho > N_s and N_lm > 0) )
+  { return debug_mesg("Invalid argument"); }
 
   //// Define useful variables
   const double rho_p_min = rho_p_lim[0], rho_p_max = rho_p_lim[1];
 
-
   //// Aliasing
-  std::complex<double> **psi_arr_arr = psi_in_sph_harm_basis_arr;
+  const std::complex<double> **psi_arr_arr = psi_in_sph_harm_basis_arr;
 
 
   //// Allocate data storage
-  std::complex<double> *Ylm_p_arr = new std::complex<double>[N_p];
-  std::complex<double> *psi_p_arr = new std::complex<double>[N_p];
-  std::complex<double> *dpsidrho_p_arr = new std::complex<double>[N_p];
+//  std::complex<double> *Ylm_p_arr = new std::complex<double>[N_p];
+//  std::complex<double> *psi_p_arr = new std::complex<double>[N_p];
+//  std::complex<double> *dpsidrho_p_arr = new std::complex<double>[N_p];
 
-  const size_t type_size = sizeof(std::complex<double>);
-  std::complex<double> 
-    *denum_p_arr = (std::complex<double> *) std::calloc(N_p, type_size),
-    *numer_p_rho_arr = (std::complex<double> *) std::calloc(N_p, type_size),
-    *numer_p_theta_arr = (std::complex<double> *) std::calloc(N_p, type_size),
-    *numer_p_phi_arr = (std::complex<double> *) std::calloc(N_p, type_size);
+//  const size_t type_size = sizeof(std::complex<double>);
+//  std::complex<double> 
+//    *denum_p_arr = (std::complex<double> *) std::calloc(N_p, type_size),
+//    *numer_p_rho_arr = (std::complex<double> *) std::calloc(N_p, type_size),
+//    *numer_p_theta_arr = (std::complex<double> *) std::calloc(N_p, type_size),
+//    *numer_p_phi_arr = (std::complex<double> *) std::calloc(N_p, type_size);
   
+  std::complex<double> 
+    denum_p = 0, numer_rho_p = 0, numer_theta_p = 0, numer_phi_p = 0;
 
-  double 
-    *rho_p_arr = r_p_arr[0], 
-    *theta_p_arr = r_p_arr[1],
-    *phi_p_arr = r_p_arr[2];
+  double rho_p = r_p_vec[0], theta_p = r_p_vec[1], phi_p = r_p_vec[2];
+
+//  double 
+//    *rho_p_arr = r_p_arr[0], 
+//    *theta_p_arr = r_p_arr[1],
+//    *phi_p_arr = r_p_arr[2];
 
   int return_code = EXIT_FAILURE;
   
 
   //// Variables to be used in loop
   int i_lm;
-  std::complex<double> *psi_arr, **psi_arr_p;
+  const std::complex<double> *psi_arr, **psi_arr_p;
   int *l_p, *m_p;
   std::complex<double> exp_phi, Ylm, Yl1m, psi_p, dpsi_p;
   double l, m, m_power_of_minus_1;
   int li, mi, m_sign, m_abs;
 
-  double *theta_p_p, *phi_p_p, rho_p, theta_p, phi_p;
-  int i_p;
+//  double *theta_p_p, *phi_p_p;
+//  double rho_p, theta_p, phi_p;
+//  int i_p;
 
   bool out_of_range;
 
-  std::complex<double> *psi_p_p, *dpsi_p_p;
+//  std::complex<double> *psi_p_p, *dpsi_p_p;
 
 
 #ifdef DEBUG
@@ -410,13 +415,12 @@ int eval_v_p_arr_for_sph_harm_basis(
 
   
     //// Estimate `psi_p` and `dpsidrho_p` using finite difference
-    return_code = eval_psi_and_dpsidx_arr< std::complex<double> >(
-        rho_p_arr, psi_arr, rho_arr,
-        N_s, N_p, N_rho, rho_p_lim,
-        psi_p_arr, dpsidrho_p_arr);
-    if (return_code != EXIT_SUCCESS) {
-      return return_with_mesg("Failed to 'eval_psi_and_dpsidx_arr()'");
-    }
+    return_code = eval_psi_and_dpsidx_p< std::complex<double> >(
+        rho_p, psi_arr, rho_arr,
+        N_s, N_rho, rho_p_lim,
+        &psi_p, &dpsi_p);
+    if (return_code != EXIT_SUCCESS)
+    { return debug_mesg("Failed to 'eval_psi_and_dpsidx_p()'"); }
 
 
 #ifdef DEBUG
@@ -429,43 +433,46 @@ int eval_v_p_arr_for_sph_harm_basis(
 #endif // DEBUG
 
 
-    for (
-        i_p = 0, theta_p_p = theta_p_arr, phi_p_p = phi_p_arr,
-        psi_p_p = psi_p_arr, dpsi_p_p = dpsidrho_p_arr;
-        i_p < N_p;
-        i_p++, theta_p_p++, phi_p_p++, psi_p_p++, dpsi_p_p++
-        )
-    {
+//    for (
+//        i_p = 0, theta_p_p = theta_p_arr, phi_p_p = phi_p_arr,
+//        psi_p_p = psi_p_arr, dpsi_p_p = dpsidrho_p_arr;
+//        i_p < N_p;
+//        i_p++, theta_p_p++, phi_p_p++, psi_p_p++, dpsi_p_p++
+//        )
+//    {
 
-      rho_p = rho_p_arr[i_p];
+//    rho_p = rho_p_arr[i_p];
 
-      out_of_range = rho_p_min > rho_p or rho_p >= rho_p_max; 
-      if (out_of_range) { continue; }
+    out_of_range = rho_p_min > rho_p or rho_p >= rho_p_max; 
+    if (out_of_range) { 
+      for (int i_p_dim = 0; i_p_dim < DIM_R; i_p_dim++) 
+      { v_p_vec[i_p_dim] = 0.0; }
+      return EXIT_SUCCESS;
+    }
 
-      theta_p = *theta_p_p, phi_p = *phi_p_p;
-      psi_p = *psi_p_p, dpsi_p = *dpsi_p_p;
+//    theta_p = *theta_p_p, phi_p = *phi_p_p;
+//    psi_p = *psi_p_p, dpsi_p = *dpsi_p_p;
 
-      if (rho_p == 0 or sin(theta_p) == 0) {
-        return return_with_mesg("Zero 'rho_p' or 'sin(theta_p)' occurred");
-      }
+    if (rho_p == 0 or sin(theta_p) == 0) 
+    { return debug_mesg("Zero 'rho_p' or 'sin(theta_p)' occurred"); }
 
-      exp_phi = std::complex<double>(cos(m_abs*phi_p), sin(m_abs*phi_p));
-      Ylm = gsl_sf_legendre_sphPlm(li, m_abs, cos(theta_p)) * exp_phi;
-      Yl1m = gsl_sf_legendre_sphPlm(li+1, m_abs, cos(theta_p)) * exp_phi;
-      if (mi < 0) {
-        Ylm = m_power_of_minus_1 * std::conj(Ylm);
-        Yl1m = m_power_of_minus_1 * std::conj(Yl1m);
-      }
+    exp_phi = std::complex<double>(cos(m_abs*phi_p), sin(m_abs*phi_p));
+    Ylm = gsl_sf_legendre_sphPlm(li, m_abs, cos(theta_p)) * exp_phi;
+    Yl1m = gsl_sf_legendre_sphPlm(li+1, m_abs, cos(theta_p)) * exp_phi;
+    if (mi < 0) {
+      Ylm = m_power_of_minus_1 * std::conj(Ylm);
+      Yl1m = m_power_of_minus_1 * std::conj(Yl1m);
+    }
 
-      denum_p_arr[i_p] += psi_p * Ylm;
-      numer_p_rho_arr[i_p] += dpsi_p * Ylm;
-      numer_p_theta_arr[i_p] 
-        += -cos(theta_p) * l * psi_p * Ylm
-        + sqrt( (2.0*l+1.0)/(2.0*l+3.0) * (l+1.0+m) * (l+1.0-m) )
-          * psi_p * Yl1m;
-      numer_p_phi_arr[i_p] += m * psi_p * Ylm;
-      
-    } // i_p
+    denum_p += psi_p * Ylm;
+    numer_rho_p += dpsi_p * Ylm;
+    numer_theta_p
+      += -cos(theta_p) * l * psi_p * Ylm
+      + sqrt( (2.0*l+1.0)/(2.0*l+3.0) * (l+1.0+m) * (l+1.0-m) )
+        * psi_p * Yl1m;
+    numer_phi_p += m * psi_p * Ylm;
+    
+//    } // i_p
 
   } // i_lm
 
@@ -509,110 +516,449 @@ int eval_v_p_arr_for_sph_harm_basis(
   printf("v_p_arr: \n");
 #endif // DEBUG
 
-  for (int i_p = 0; i_p < N_p; i_p++)
-  {
+//  for (int i_p = 0; i_p < N_p; i_p++)
+//  {
     
-    //// Check in-range
-    out_of_range = rho_p_min > rho_p_arr[i_p] or rho_p_arr[i_p] >= rho_p_max;
-    
-    //// Velocity evaluation
-    if (out_of_range) { // then velocity is set to be zero
+//    //// Check in-range
+//    out_of_range = rho_p_min > rho_p_arr[i_p] or rho_p_arr[i_p] >= rho_p_max;
+//    
+//    //// Velocity evaluation
+//    if (out_of_range) { // then velocity is set to be zero
+//
+//      for (int i_r_dim = 0; i_r_dim < N_r_dim; i_r_dim++) {
+//        v_p_arr[i_r_dim][i_p] = 0.0;
+//      }
+//    } 
 
-      for (int i_r_dim = 0; i_r_dim < N_r_dim; i_r_dim++) {
-        v_p_arr[i_r_dim][i_p] = 0.0;
-      }
-    } 
-    else {
+//    else {
       
-      // Check singularity
-      if (denum_p_arr[i_p] == 0.0) { 
-  
-        fprintf(stderr,"[ LOG ] %-25s\n","denum_p_arr: ");
-        fprintf(stderr,"%5s (%20s,%20s)\n","i_p","real","imag");
-        for (int i_p = 0; i_p < N_p; i_p++) {
-          fprintf(stderr,"%5d (%20.15f,%20.15f)\n",
-              i_p, denum_p_arr[i_p].real(),denum_p_arr[i_p].imag());
-        } fprintf(stderr,"\n");
-  
-        fprintf(stderr,"[ LOG ] index of particle with zero psi_p: %d\n",i_p);
-  
-        fprintf(stderr,
-            "[ LOG ] r_p_arr\n"
-            "        = (%19s,%19s,%19s)\n"
-            "        = (%19.15f,%19.15f,%19.15f)\n",
-            "rho_p","theta_p","phi_p",
-            r_p_arr[0][i_p],r_p_arr[1][i_p],r_p_arr[2][i_p]);
-  
-        fprintf(stderr,"\n");
-  
-        fprintf(stderr,
-            "[ LOG ] v_p_arr\n"
-            "        = (%19s,%19s,%19s)\n"
-            "        = (%19.15f,%19.15f,%19.15f)\n",
-            "v_rho_p","v_theta_p","v_phi_p",
-            v_p_arr[0][i_p],v_p_arr[1][i_p],v_p_arr[2][i_p]);
-  
-        fprintf(stderr,"\n");
-        
-        double delta_rho = rho_arr[1] - rho_arr[0];
-        int i_rho_nls = (int) (r_p_arr[0][i_p] - rho_arr[0]) / delta_rho;
-  
-        fprintf(stderr,
-            "[ LOG ] radial grid point index of nearest left stencil: "
-            "%d (= %.15f a.u.)\n",
-            i_rho_nls, delta_rho * i_rho_nls);
-        fprintf(stderr,"\n");
-  
-        fprintf(stderr,"[ LOG ] psi_arr_arr[i_lm][i_rho_nls]: \n");
-        fprintf(stderr,"\n");
-        fprintf(stderr,"%5s (%19s,%19s)\n","i_lm","real","imag");
-        std::complex<double> _psi;
-        for (int i_lm = 0; i_lm < N_lm; i_lm++) {
-          _psi = psi_arr_arr[i_lm][i_rho_nls];
-          fprintf(stderr,"%5d (%19.15f,%19.15f)\n",
-              i_lm,std::real(_psi),std::imag(_psi));
-        } fprintf(stderr,"\n");
-  
-        return return_with_mesg("Zero 'psi_p' occurred"); 
-      }
+  // Check singularity
+  if (denum_p == 0.0) { 
+
+    fprintf(stderr,"[ LOG ] %-25s\n","denum_p_arr: ");
+    fprintf(stderr,"(%20s,%20s)\n","real","imag");
+    fprintf(stderr,"(%20.15f,%20.15f)\n",denum_p.real(),denum_p.imag());
+
+    fprintf(stderr,"\n");
+
+    fprintf(stderr,
+        "[ LOG ] r_p_vec\n"
+        "        = (%19s,%19s,%19s)\n"
+        "        = (%19.15f,%19.15f,%19.15f)\n",
+        "rho_p","theta_p","phi_p",
+        r_p_vec[0],r_p_vec[1],r_p_vec[2]);
+
+    fprintf(stderr,"\n");
+
+    fprintf(stderr,
+        "[ LOG ] v_p_vec\n"
+        "        = (%19s,%19s,%19s)\n"
+        "        = (%19.15f,%19.15f,%19.15f)\n",
+        "v_rho_p","v_theta_p","v_phi_p",
+        v_p_vec[0],v_p_vec[1],v_p_vec[2]);
+
+    fprintf(stderr,"\n");
+    
+    double delta_rho = rho_arr[1] - rho_arr[0];
+    const int i_rho_nls = (int) (r_p_vec[0] - rho_arr[0]) / delta_rho;
+
+    fprintf(stderr,
+        "[ LOG ] radial grid point index of nearest left stencil: "
+        "%d (= %.15f a.u.)\n",
+        i_rho_nls, delta_rho * i_rho_nls);
+    fprintf(stderr,"\n");
+
+    fprintf(stderr,"[ LOG ] psi_arr_arr[i_lm][i_rho_nls]: \n");
+    fprintf(stderr,"\n");
+    fprintf(stderr,"%5s (%19s,%19s)\n","i_lm","real","imag");
+    std::complex<double> _psi;
+    for (int i_lm = 0; i_lm < N_lm; i_lm++) {
+      _psi = psi_arr_arr[i_lm][i_rho_nls];
+      fprintf(stderr,"%5d (%19.15f,%19.15f)\n",
+          i_lm,std::real(_psi),std::imag(_psi));
+    } fprintf(stderr,"\n");
+
+    return return_with_mesg("Zero 'psi_p' occurred"); 
+  }  // if denum == 0
 
 
-      // Evaluate velocity if not singular
-      v_p_arr[0][i_p] 
-        = (numer_p_rho_arr[i_p] / denum_p_arr[i_p]).imag();
+  // Evaluate velocity if not singular
+  v_p_vec[0]
+    = (numer_rho_p / denum_p).imag();
 
-      v_p_arr[1][i_p] 
-        = (numer_p_theta_arr[i_p] / denum_p_arr[i_p]).imag()
-        / (rho_p_arr[i_p] * sin(theta_p_arr[i_p]));
+  v_p_vec[1]
+    = (numer_theta_p / denum_p).imag()
+    / (rho_p * sin(theta_p));
 
-      v_p_arr[2][i_p] 
-        = (numer_p_phi_arr[i_p] / denum_p_arr[i_p]).real()
-        / (rho_p_arr[i_p] * sin(theta_p_arr[i_p]));
+  v_p_vec[2] 
+    = (numer_phi_p / denum_p).real()
+    / (rho_p * sin(theta_p));
 
-    }
+//    }
 
 #ifdef DEBUG
-    printf("%5d%15.5f%15.5f%15.5f\n", 
-        i_p, 
-        v_p_arr[0][i_p], v_p_arr[1][i_p], v_p_arr[2][i_p]);
+  printf("%5d%15.5f%15.5f%15.5f\n", 
+      i_p, 
+      v_p_arr[0][i_p], v_p_arr[1][i_p], v_p_arr[2][i_p]);
 #endif // DEBUG
 
-  }
+//  } // for-loop `i_p`
 
 
   //// Deallocate data storage
-  delete [] Ylm_p_arr;
-  delete [] psi_p_arr;
-  delete [] dpsidrho_p_arr;
+//  delete [] Ylm_p_arr;
+//  delete [] psi_p_arr;
+//  delete [] dpsidrho_p_arr;
 
-  std::free(denum_p_arr);
-  std::free(numer_p_rho_arr);
-  std::free(numer_p_theta_arr);
-  std::free(numer_p_phi_arr);
+//  std::free(denum_p_arr);
+//  std::free(numer_p_rho_arr);
+//  std::free(numer_p_theta_arr);
+//  std::free(numer_p_phi_arr);
 
 
   //// Return from thie program
   return EXIT_SUCCESS;
 
+}
+
+
+
+
+
+
+
+
+//// `eval_v_p_arr_for_sph_harm_basis`
+int eval_v_p_arr_for_sph_harm_basis(
+    const int N_s, const int N_p, const int N_rho, const int N_lm,
+    double **r_p_arr, const std::complex<double> **psi_in_sph_harm_basis_arr,
+    double *rho_arr, int *l_arr, int *m_arr, const double *rho_p_lim, 
+    double **v_p_arr)
+{
+
+  //// Function Argument
+  //
+  // [NOTE]
+  // `DIM_R` : the dimension of paritlce's position vector space
+  //
+  // [INPUT]
+  // `N_s` : the number of stencils used in finite-difference approximation
+  //         for estimating psi and dpsidrho at particle's radial coodinate
+  // `N_p` : the number of particles
+  // `N_rho` : the number of radial grid points
+  // `N_lm` : the number of spherical harmonics basis
+  //
+  // `r_p_arr` : 2D array of shape (`DIM_R`,`N_p`)
+  // `psi_in_sph_harm_basis_arr` : 2D array of shape (`N_lm`,`N_rho`)
+  // `rho_arr` : 1D array of shape (`N_rho`,)
+  // `l_arr` : 1D array of shape (`l_arr`,)
+  // `m_arr` : 1D array of shape (`m_arr`,)
+  // `rho_p_lim` : 1D array of shape (2,)
+  //
+  // [OUTPUT]
+  // `v_p_arr` : 2D array of shape (`DIM_R`,`N_p`)
+  //
+
+
+  int return_code = EXIT_FAILURE;
+
+  double r_p_vec[DIM_R], v_p_vec[DIM_R];
+
+  for (int i_p = 0; i_p < N_p; i_p++) {
+
+    for (int i_dim = 0; i_dim < DIM_R; i_dim++)
+    { r_p_vec[i_dim] = r_p_arr[i_dim][i_p]; }
+
+    return_code = eval_v_p_for_sph_harm_basis(
+        N_s, N_rho, N_lm, r_p_vec, psi_in_sph_harm_basis_arr,
+        rho_arr, l_arr, m_arr, rho_p_lim, v_p_vec);
+    if (return_code != EXIT_SUCCESS) 
+    { return debug_mesg("Failed during 'eval_v_p_for_sph_harm_basis()'"); }
+
+    for (int i_dim = 0; i_dim < DIM_R; i_dim++)
+    { v_p_arr[i_dim][i_p] = v_p_vec[i_dim]; }
+
+  } // for-loop : i_p
+
+  return EXIT_SUCCESS;
+
+
+//  //// Check arguments
+//  assert(N_s > 0 and N_p > 0 and N_rho > N_s and N_lm > 0);
+//
+//
+//  //// Define useful variables
+//  const double rho_p_min = rho_p_lim[0], rho_p_max = rho_p_lim[1];
+//
+//
+//  //// Aliasing
+//  std::complex<double> **psi_arr_arr = psi_in_sph_harm_basis_arr;
+//
+//
+//  //// Allocate data storage
+//  std::complex<double> *Ylm_p_arr = new std::complex<double>[N_p];
+//  std::complex<double> *psi_p_arr = new std::complex<double>[N_p];
+//  std::complex<double> *dpsidrho_p_arr = new std::complex<double>[N_p];
+//
+//  const size_t type_size = sizeof(std::complex<double>);
+//  std::complex<double> 
+//    *denum_p_arr = (std::complex<double> *) std::calloc(N_p, type_size),
+//    *numer_p_rho_arr = (std::complex<double> *) std::calloc(N_p, type_size),
+//    *numer_p_theta_arr = (std::complex<double> *) std::calloc(N_p, type_size),
+//    *numer_p_phi_arr = (std::complex<double> *) std::calloc(N_p, type_size);
+//  
+//
+//  double 
+//    *rho_p_arr = r_p_arr[0], 
+//    *theta_p_arr = r_p_arr[1],
+//    *phi_p_arr = r_p_arr[2];
+//
+//  
+//
+//  //// Variables to be used in loop
+//  int i_lm;
+//  std::complex<double> *psi_arr, **psi_arr_p;
+//  int *l_p, *m_p;
+//  std::complex<double> exp_phi, Ylm, Yl1m, psi_p, dpsi_p;
+//  double l, m, m_power_of_minus_1;
+//  int li, mi, m_sign, m_abs;
+//
+//  double *theta_p_p, *phi_p_p, rho_p, theta_p, phi_p;
+//  int i_p;
+//
+//  bool out_of_range;
+//
+//  std::complex<double> *psi_p_p, *dpsi_p_p;
+//
+//
+//#ifdef DEBUG
+//  printf("rho_p_arr: \n");
+//  for (int i_p = 0; i_p < N_p; i_p++) {
+//    printf("%7.3f",r_p_arr[0][i_p]);
+//  } printf("\n");
+//#endif // DEBUG
+//
+//
+//  for (
+//      i_lm = 0, psi_arr_p = psi_arr_arr, l_p=l_arr, m_p=m_arr;
+//      i_lm < N_lm;
+//      i_lm++, psi_arr_p++, l_p++, m_p++
+//      ) 
+//  {
+//
+//    li = *l_p, mi = *m_p;
+//    l = (double) li;
+//    m = (double) mi;
+//    m_sign = 1 - 2 * (1 - (mi>=0));
+//    m_power_of_minus_1 = 1.0 - 2.0 * (mi%2);
+//    m_abs = m_sign * mi;
+//    psi_arr = *psi_arr_p;
+//
+//  
+//    //// Estimate `psi_p` and `dpsidrho_p` using finite difference
+//    return_code = eval_psi_and_dpsidx_arr< std::complex<double> >(
+//        rho_p_arr, psi_arr, rho_arr,
+//        N_s, N_p, N_rho, rho_p_lim,
+//        psi_p_arr, dpsidrho_p_arr);
+//    if (return_code != EXIT_SUCCESS) {
+//      return return_with_mesg("Failed to 'eval_psi_and_dpsidx_arr()'");
+//    }
+//
+//
+//#ifdef DEBUG
+//    printf("psi_arr: \n");
+//    for (int i_p = 0; i_p < N_p; i_p++) {
+//      printf(
+//          "%7.3f%7.3f\n", 
+//          psi_p_arr[i_p].real(), dpsidrho_p_arr[i_p].real());
+//    } printf("\n");
+//#endif // DEBUG
+//
+//
+//    for (
+//        i_p = 0, theta_p_p = theta_p_arr, phi_p_p = phi_p_arr,
+//        psi_p_p = psi_p_arr, dpsi_p_p = dpsidrho_p_arr;
+//        i_p < N_p;
+//        i_p++, theta_p_p++, phi_p_p++, psi_p_p++, dpsi_p_p++
+//        )
+//    {
+//
+//      rho_p = rho_p_arr[i_p];
+//
+//      out_of_range = rho_p_min > rho_p or rho_p >= rho_p_max; 
+//      if (out_of_range) { continue; }
+//
+//      theta_p = *theta_p_p, phi_p = *phi_p_p;
+//      psi_p = *psi_p_p, dpsi_p = *dpsi_p_p;
+//
+//      if (rho_p == 0 or sin(theta_p) == 0) {
+//        return return_with_mesg("Zero 'rho_p' or 'sin(theta_p)' occurred");
+//      }
+//
+//      exp_phi = std::complex<double>(cos(m_abs*phi_p), sin(m_abs*phi_p));
+//      Ylm = gsl_sf_legendre_sphPlm(li, m_abs, cos(theta_p)) * exp_phi;
+//      Yl1m = gsl_sf_legendre_sphPlm(li+1, m_abs, cos(theta_p)) * exp_phi;
+//      if (mi < 0) {
+//        Ylm = m_power_of_minus_1 * std::conj(Ylm);
+//        Yl1m = m_power_of_minus_1 * std::conj(Yl1m);
+//      }
+//
+//      denum_p_arr[i_p] += psi_p * Ylm;
+//      numer_p_rho_arr[i_p] += dpsi_p * Ylm;
+//      numer_p_theta_arr[i_p] 
+//        += -cos(theta_p) * l * psi_p * Ylm
+//        + sqrt( (2.0*l+1.0)/(2.0*l+3.0) * (l+1.0+m) * (l+1.0-m) )
+//          * psi_p * Yl1m;
+//      numer_p_phi_arr[i_p] += m * psi_p * Ylm;
+//      
+//    } // i_p
+//
+//  } // i_lm
+//
+//
+//
+//#ifdef DEBUG
+//
+//
+//  //// Print real part
+//  printf("real part: \n");
+//  printf(
+//      "%15s%15s%15s%15s\n", 
+//      "denum","numer_p_rho","numer_p_theta","numer_p_phi");
+//
+//  for (int i_p = 0; i_p < N_p; i_p++) {
+//    printf("%15.7f%15.7f%15.7f%15.7f\n",
+//        std::real(denum_p_arr[i_p]), std::real(numer_p_rho_arr[i_p]),
+//        std::real(numer_p_theta_arr[i_p]), std::real(numer_p_phi_arr[i_p]));
+//  } printf("\n");
+//
+//
+//  //// Print imaginary part
+//  printf("imag part: \n");
+//  printf(
+//      "%15s%15s%15s%15s\n", 
+//      "denum","numer_p_rho","numer_p_theta","numer_p_phi");
+//
+//  for (int i_p = 0; i_p < N_p; i_p++) {
+//    printf("%15.7f%15.7f%15.7f%15.7f\n",
+//        std::imag(denum_p_arr[i_p]), std::imag(numer_p_rho_arr[i_p]),
+//        std::imag(numer_p_theta_arr[i_p]), std::imag(numer_p_phi_arr[i_p]));
+//  } printf("\n");
+//
+//
+//#endif // DEBUG
+//
+//
+//
+//
+//#ifdef DEBUG
+//  printf("v_p_arr: \n");
+//#endif // DEBUG
+//
+//  for (int i_p = 0; i_p < N_p; i_p++)
+//  {
+//    
+//    //// Check in-range
+//    out_of_range = rho_p_min > rho_p_arr[i_p] or rho_p_arr[i_p] >= rho_p_max;
+//    
+//    //// Velocity evaluation
+//    if (out_of_range) { // then velocity is set to be zero
+//
+//      for (int i_r_dim = 0; i_r_dim < DIM_R; i_r_dim++) {
+//        v_p_arr[i_r_dim][i_p] = 0.0;
+//      }
+//    } 
+//    else {
+//      
+//      // Check singularity
+//      if (denum_p_arr[i_p] == 0.0) { 
+//  
+//        fprintf(stderr,"[ LOG ] %-25s\n","denum_p_arr: ");
+//        fprintf(stderr,"%5s (%20s,%20s)\n","i_p","real","imag");
+//        for (int i_p = 0; i_p < N_p; i_p++) {
+//          fprintf(stderr,"%5d (%20.15f,%20.15f)\n",
+//              i_p, denum_p_arr[i_p].real(),denum_p_arr[i_p].imag());
+//        } fprintf(stderr,"\n");
+//  
+//        fprintf(stderr,"[ LOG ] index of particle with zero psi_p: %d\n",i_p);
+//  
+//        fprintf(stderr,
+//            "[ LOG ] r_p_arr\n"
+//            "        = (%19s,%19s,%19s)\n"
+//            "        = (%19.15f,%19.15f,%19.15f)\n",
+//            "rho_p","theta_p","phi_p",
+//            r_p_arr[0][i_p],r_p_arr[1][i_p],r_p_arr[2][i_p]);
+//  
+//        fprintf(stderr,"\n");
+//  
+//        fprintf(stderr,
+//            "[ LOG ] v_p_arr\n"
+//            "        = (%19s,%19s,%19s)\n"
+//            "        = (%19.15f,%19.15f,%19.15f)\n",
+//            "v_rho_p","v_theta_p","v_phi_p",
+//            v_p_arr[0][i_p],v_p_arr[1][i_p],v_p_arr[2][i_p]);
+//  
+//        fprintf(stderr,"\n");
+//        
+//        double delta_rho = rho_arr[1] - rho_arr[0];
+//        int i_rho_nls = (int) (r_p_arr[0][i_p] - rho_arr[0]) / delta_rho;
+//  
+//        fprintf(stderr,
+//            "[ LOG ] radial grid point index of nearest left stencil: "
+//            "%d (= %.15f a.u.)\n",
+//            i_rho_nls, delta_rho * i_rho_nls);
+//        fprintf(stderr,"\n");
+//  
+//        fprintf(stderr,"[ LOG ] psi_arr_arr[i_lm][i_rho_nls]: \n");
+//        fprintf(stderr,"\n");
+//        fprintf(stderr,"%5s (%19s,%19s)\n","i_lm","real","imag");
+//        std::complex<double> _psi;
+//        for (int i_lm = 0; i_lm < N_lm; i_lm++) {
+//          _psi = psi_arr_arr[i_lm][i_rho_nls];
+//          fprintf(stderr,"%5d (%19.15f,%19.15f)\n",
+//              i_lm,std::real(_psi),std::imag(_psi));
+//        } fprintf(stderr,"\n");
+//  
+//        return return_with_mesg("Zero 'psi_p' occurred"); 
+//      }
+//
+//
+//      // Evaluate velocity if not singular
+//      v_p_arr[0][i_p] 
+//        = (numer_p_rho_arr[i_p] / denum_p_arr[i_p]).imag();
+//
+//      v_p_arr[1][i_p] 
+//        = (numer_p_theta_arr[i_p] / denum_p_arr[i_p]).imag()
+//        / (rho_p_arr[i_p] * sin(theta_p_arr[i_p]));
+//
+//      v_p_arr[2][i_p] 
+//        = (numer_p_phi_arr[i_p] / denum_p_arr[i_p]).real()
+//        / (rho_p_arr[i_p] * sin(theta_p_arr[i_p]));
+//
+//    }
+//
+//#ifdef DEBUG
+//    printf("%5d%15.5f%15.5f%15.5f\n", 
+//        i_p, 
+//        v_p_arr[0][i_p], v_p_arr[1][i_p], v_p_arr[2][i_p]);
+//#endif // DEBUG
+//
+//  }
+//
+//
+//  //// Deallocate data storage
+//  delete [] Ylm_p_arr;
+//  delete [] psi_p_arr;
+//  delete [] dpsidrho_p_arr;
+//
+//  std::free(denum_p_arr);
+//  std::free(numer_p_rho_arr);
+//  std::free(numer_p_theta_arr);
+//  std::free(numer_p_phi_arr);
+//
+//
+//  //// Return from thie program
+//  return EXIT_SUCCESS;
+//
 }
 
