@@ -3,6 +3,7 @@
 #include <cmath>
 
 #include "../../include/velocity.hh"
+#include "../../include/log.hh"
 
 typedef std::complex<double> m_t;
 
@@ -53,8 +54,7 @@ int main(int argc, char *argv[]) {
       psi_p_arr, dpsidx_p_arr);
 
   if (return_code != EXIT_SUCCESS) {
-    fprintf(stderr, "[ERROR] Failed to run 'eval_psi_and_dpsidx_arr()'");
-    return return_code;
+    return debug_mesg("Failed to run 'eval_psi_and_dpsidx_arr()'");
   }
 
 
