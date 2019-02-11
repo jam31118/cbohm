@@ -475,27 +475,78 @@ int eval_v_p_arr_for_sph_harm_basis(
   for (int i_p = 0; i_p < N_p; i_p++)
   {
     
-    //// Check singularity
-    if (denum_p_arr[i_p] == 0.0) { 
-      return return_with_mesg("Zero 'psi_p' occurred"); 
-    }
-
-    //// Velocity evaluation
+    //// Check in-range
     out_of_range = rho_p_min > rho_p_arr[i_p] or rho_p_arr[i_p] >= rho_p_max;
-    if (out_of_range) {
+    
+    //// Velocity evaluation
+    if (out_of_range) { // then velocity is set to be zero
 
       for (int i_r_dim = 0; i_r_dim < N_r_dim; i_r_dim++) {
         v_p_arr[i_r_dim][i_p] = 0.0;
       }
     } 
     else {
+      
+      // Check singularity
+      if (denum_p_arr[i_p] == 0.0) { 
+  
+        fprintf(stderr,"[ LOG ] %-25s\n","denum_p_arr: ");
+        fprintf(stderr,"%5s (%20s,%20s)\n","i_p","real","imag");
+        for (int i_p = 0; i_p < N_p; i_p++) {
+          fprintf(stderr,"%5d (%20.15f,%20.15f)\n",
+              i_p, denum_p_arr[i_p].real(),denum_p_arr[i_p].imag());
+        } fprintf(stderr,"\n");
+  
+        fprintf(stderr,"[ LOG ] index of particle with zero psi_p: %d\n",i_p);
+  
+        fprintf(stderr,
+            "[ LOG ] r_p_arr\n"
+            "        = (%19s,%19s,%19s)\n"
+            "        = (%19.15f,%19.15f,%19.15f)\n",
+            "rho_p","theta_p","phi_p",
+            r_p_arr[0][i_p],r_p_arr[1][i_p],r_p_arr[2][i_p]);
+  
+        fprintf(stderr,"\n");
+  
+        fprintf(stderr,
+            "[ LOG ] v_p_arr\n"
+            "        = (%19s,%19s,%19s)\n"
+            "        = (%19.15f,%19.15f,%19.15f)\n",
+            "v_rho_p","v_theta_p","v_phi_p",
+            v_p_arr[0][i_p],v_p_arr[1][i_p],v_p_arr[2][i_p]);
+  
+        fprintf(stderr,"\n");
+        
+        double delta_rho = rho_arr[1] - rho_arr[0];
+        int i_rho_nls = (int) (r_p_arr[0][i_p] - rho_arr[0]) / delta_rho;
+  
+        fprintf(stderr,
+            "[ LOG ] radial grid point index of nearest left stencil: "
+            "%d (= %.15f a.u.)\n",
+            i_rho_nls, delta_rho * i_rho_nls);
+        fprintf(stderr,"\n");
+  
+        fprintf(stderr,"[ LOG ] psi_arr_arr[i_lm][i_rho_nls]: \n");
+        fprintf(stderr,"\n");
+        fprintf(stderr,"%5s (%19s,%19s)\n","i_lm","real","imag");
+        std::complex<double> _psi;
+        for (int i_lm = 0; i_lm < N_lm; i_lm++) {
+          _psi = psi_arr_arr[i_lm][i_rho_nls];
+          fprintf(stderr,"%5d (%19.15f,%19.15f)\n",
+              i_lm,std::real(_psi),std::imag(_psi));
+        } fprintf(stderr,"\n");
+  
+        return return_with_mesg("Zero 'psi_p' occurred"); 
+      }
 
+
+      // Evaluate velocity if not singular
       v_p_arr[0][i_p] 
         = (numer_p_rho_arr[i_p] / denum_p_arr[i_p]).imag();
 
       v_p_arr[1][i_p] 
         = (numer_p_theta_arr[i_p] / denum_p_arr[i_p]).imag()
-        / (rho_p_arr[i_p]);
+        / (rho_p_arr[i_p] * sin(theta_p_arr[i_p]));
 
       v_p_arr[2][i_p] 
         = (numer_p_phi_arr[i_p] / denum_p_arr[i_p]).real()
