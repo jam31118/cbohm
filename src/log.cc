@@ -18,6 +18,7 @@ int return_with_debug_mesg_func(
   return return_with_mesg(debug_mesg, return_code);
 }
 
+
 void print_bar() {
   printf("\n----------------------\n\n");
 }

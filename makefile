@@ -2,13 +2,13 @@ SRC_DIR = ./src
 TEST_DIR = ./test
 TEST_SUBDIRS := $(wildcard $(TEST_DIR)/*/.)
 
-.PHONY: $(TEST_SUBDIRS)
+.PHONY: install $(TEST_SUBDIRS)
 all: install
 
 install:
 	+$(MAKE) -C $(SRC_DIR)
 
-test: $(TEST_SUBDIRS)
+test: install $(TEST_SUBDIRS)
 
 $(TEST_SUBDIRS):
 	+$(MAKE) -C $@

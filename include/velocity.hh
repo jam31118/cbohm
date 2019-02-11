@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <complex>
+#include <cstring>
 
 #ifndef DEBUG
 #define NDEBUG
