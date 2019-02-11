@@ -4,6 +4,43 @@
 #include "gsl/gsl_sf_legendre.h"
 
 
+int eval_shift_offset(
+    const int num_of_stencils, const int i_x_s_at_nls, 
+    const int N_x, int *const offset) {
+
+  //// Declaration
+  int shift_offset_to_right, shift_offset_to_left;
+  bool do_shift_to_right, do_shift_to_left;
+
+  //// Define required values
+  const int i_x_max = N_x - 1;
+  const int N_s_on_left = (num_of_stencils / 2) - 1;
+  const int N_s_on_right = num_of_stencils - N_s_on_left - 1;
+
+  shift_offset_to_right = N_s_on_left - i_x_s_at_nls;
+  shift_offset_to_left = (i_x_max - i_x_s_at_nls) - N_s_on_right;
+
+  do_shift_to_right = shift_offset_to_right > 0;
+  do_shift_to_left = shift_offset_to_left < 0;
+
+  //// Check if shift occurs at both direction, which is abnormal
+  if (do_shift_to_right and do_shift_to_left) 
+//  { return return_with_mesg("Cannot shift to both direction"); }
+  { return debug_mesg("Cannot shift to both direction"); }
+//  { return return_with_debug_mesg(
+//      "Cannot shift to both direction", __FILE__, __LINE__, __func__); }
+
+  //// Evaluate the offset
+  *offset 
+    = do_shift_to_right * shift_offset_to_right 
+    + do_shift_to_left * shift_offset_to_left;
+
+  //// Return if everything is fine
+  return EXIT_SUCCESS;
+
+}
+
+
 template <typename T>
 int eval_psi_and_dpsidx_arr(
     double *x_p_arr, T *psi_arr, double *x_arr, 
@@ -27,7 +64,7 @@ int eval_psi_and_dpsidx_arr(
 
   //// Define some useful variables
   const double delta_x = x_arr[1] - x_arr[0];
-  const int i_x_max = N_x - 1;
+//  const int i_x_max = N_x - 1;
 
   
   //// Aliasing
@@ -68,29 +105,33 @@ int eval_psi_and_dpsidx_arr(
   // in this case.
 
 
-  const int N_s_on_left = (num_of_stencils / 2) - 1;
   const int index_of_nearest_left_stencil = (num_of_stencils / 2) - 1;
   const int i_nlp = index_of_nearest_left_stencil; // aliasing
-  const int N_s_on_right = num_of_stencils - N_s_on_left - 1;
 
   double *x_p_arr_p, *x_p_arr_p_max = x_p_arr + N_p;
   T *psi_p_arr_p, *dpsidx_p_arr_p;
   double x_p;
 
-  int *i_x_s_arr = new int[num_of_stencils];
+  int i_x_s_arr[num_of_stencils];
+//  int *i_x_s_arr = new int[num_of_stencils];
   int i_s, *i_x_s_arr_p, *i_x_s_arr_p_max = i_x_s_arr + N_s;
   int i_x_s_at_nls;
 
-  int shift_offset_to_right, shift_offset_to_left;
-  bool do_shift_to_right, do_shift_to_left;
+//  const int N_s_on_left = (num_of_stencils / 2) - 1;
+//  const int N_s_on_right = num_of_stencils - N_s_on_left - 1;
+//  int shift_offset_to_right, shift_offset_to_left, shift_offset;
+//  bool do_shift_to_right, do_shift_to_left;
+  int shift_offset;
 
-  double **power_matrix = new double*[num_of_stencils];
+  double *power_matrix[num_of_stencils];
+//  double **power_matrix = new double*[num_of_stencils];
   double *power_matrix_1d = new double[num_of_stencils*num_of_stencils];
   for (int i_s = 0; i_s < num_of_stencils; ++i_s) {
     power_matrix[i_s] = power_matrix_1d + i_s * num_of_stencils;
   }
   int b_vec_matrix_col_num = 2; // for psi and dpsidx respectively.
-  double **b_vec_matrix = new double*[b_vec_matrix_col_num];
+  double *b_vec_matrix[b_vec_matrix_col_num];
+//  double **b_vec_matrix = new double*[b_vec_matrix_col_num];
   double *b_vec_matrix_1d = new double[num_of_stencils * b_vec_matrix_col_num];
   for (int i_col = 0; i_col < b_vec_matrix_col_num; i_col++) {
     b_vec_matrix[i_col] = b_vec_matrix_1d + i_col * num_of_stencils;
@@ -106,7 +147,8 @@ int eval_psi_and_dpsidx_arr(
 
   // The pivot indices that define the permutation matrix P;
   // row i of the matrix was interchanged with row IPIV(i).
-  int *pivot_indices = new int[num_of_stencils];
+  int pivot_indices[num_of_stencils];
+//  int *pivot_indices = new int[num_of_stencils];
   int gesv_info;
 
   T psi_x_s;
@@ -120,6 +162,7 @@ int eval_psi_and_dpsidx_arr(
       )
   {
 
+    //// Evaluate `x_p` for preventing repetitive 
     x_p = *x_p_arr_p;
 
     //// Check in-range
@@ -128,14 +171,21 @@ int eval_psi_and_dpsidx_arr(
 
     i_x_s_at_nls = (x_p - x_arr[0]) / delta_x;
 
-    shift_offset_to_right = N_s_on_left - i_x_s_at_nls;
-    shift_offset_to_left = (i_x_max - i_x_s_at_nls) - N_s_on_right;
+    if (eval_shift_offset(N_s,i_x_s_at_nls,N_x,&shift_offset) != EXIT_SUCCESS)
+    { return debug_mesg("Failed to evaluate 'shift_offset'"); }
+//    shift_offset_to_right = N_s_on_left - i_x_s_at_nls;
+//    shift_offset_to_left = (i_x_max - i_x_s_at_nls) - N_s_on_right;
+//
+//    do_shift_to_right = shift_offset_to_right > 0;
+//    do_shift_to_left = shift_offset_to_left < 0;
+//    if (do_shift_to_right and do_shift_to_left) {
+//      return return_with_mesg("Cannot shift to both direction");
+//    }
+//
+//    shift_offset 
+//      = do_shift_to_right * shift_offset_to_right 
+//      + do_shift_to_left * shift_offset_to_left;
 
-    do_shift_to_right = shift_offset_to_right > 0;
-    do_shift_to_left = shift_offset_to_left < 0;
-    if (do_shift_to_right and do_shift_to_left) {
-      return return_with_mesg("Cannot shift to both direction");
-    }
 
 
     for (
@@ -144,9 +194,9 @@ int eval_psi_and_dpsidx_arr(
         ++i_x_s_arr_p, ++i_s
         ) 
     {
-      *i_x_s_arr_p = i_x_s_at_nls + (i_s - i_nlp) 
-        + do_shift_to_right * shift_offset_to_right
-        + do_shift_to_left * shift_offset_to_left;
+      *i_x_s_arr_p = i_x_s_at_nls + (i_s - i_nlp) + shift_offset; 
+//        + do_shift_to_right * shift_offset_to_right
+//        + do_shift_to_left * shift_offset_to_left;
 
       
       // Construct the power matrix - in column major for FORTRAN LAPACK
@@ -240,12 +290,12 @@ int eval_psi_and_dpsidx_arr(
 
 
   //// Deallocate memory
-  delete [] i_x_s_arr; 
+//  delete [] i_x_s_arr; 
 
   delete [] power_matrix[0];
-  delete [] power_matrix;
+//  delete [] power_matrix;
   delete [] b_vec_matrix[0];
-  delete [] b_vec_matrix;
+//  delete [] b_vec_matrix;
 
 
   // Returns if everything is fine.
