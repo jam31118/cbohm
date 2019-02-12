@@ -18,6 +18,13 @@
 
 
 template <typename T>
+int eval_psi_deriv_p(
+    const double x_p, const T *psi_arr, const double *x_arr, 
+    const int N_s, const int N_x, const double *x_p_lim, const int N_o,
+    const int *deriv_order_arr, T *psi_deriv_p_arr);
+
+
+template <typename T>
 int eval_psi_and_dpsidx_p(
     const double x_p, const T *psi_arr, const double *x_arr, 
     const int N_s, const int N_x, const double *x_p_lim, 

@@ -38,12 +38,22 @@ int eval_shift_offset(
 }
 
 
-
 template <typename T>
-int eval_psi_and_dpsidx_p(
+int eval_psi_deriv_p(
     const double x_p, const T *psi_arr, const double *x_arr, 
-    const int N_s, const int N_x, const double *x_p_lim, 
-    T *psi_p_arr_p, T *dpsidx_p_arr_p) {
+    const int N_s, const int N_x, const double *x_p_lim, const int N_o,
+    const int *deriv_order_arr, T *psi_deriv_p_arr) {
+  
+  //// Check arguments
+  if ( !(N_s > 0 and N_x > N_s and N_o > 0 and N_o <= N_s) )
+  { return debug_mesg("Invalid argument"); }
+  for (int i_o = 0; i_o < N_o; i_o++) {
+    if (deriv_order_arr[i_o] >= N_s) { 
+      fprintf(stderr,"[ERROR] invalid deriv_order_arr[%d]: '%d' (>=N_S=%d)\n",
+          i_o, deriv_order_arr[i_o], N_s);
+      return debug_mesg("Invalid derivative order found"); 
+    }
+  }
 
   //// Define some useful variables
   const double delta_x = x_arr[1] - x_arr[0];
@@ -98,7 +108,7 @@ int eval_psi_and_dpsidx_p(
   double power_matrix[num_of_stencils][num_of_stencils];
   double *power_matrix_1d = power_matrix[0];
 
-  int b_vec_matrix_col_num = 2; // for psi and dpsidx respectively.
+  const int b_vec_matrix_col_num = N_o; // for psi and dpsidx respectively.
   double *b_vec_matrix[b_vec_matrix_col_num];
   double b_vec_matrix_1d[b_vec_matrix_col_num * num_of_stencils];
   for (int i_col = 0; i_col < b_vec_matrix_col_num; i_col++)
@@ -118,7 +128,8 @@ int eval_psi_and_dpsidx_p(
   int gesv_info;
 
   T psi_x_s;
-
+  
+  int deriv_order;
   
   //// Check in-range
   if (x_p_lim[0] > x_p or x_p >= x_p_lim[1]) { return CODE_OUT_OF_RANGE; }
@@ -148,9 +159,12 @@ int eval_psi_and_dpsidx_p(
 
   } // for-loop `i_s`
 
-
-  b_vec_matrix[0][0] = 1.0; // for psi
-  b_vec_matrix[1][1] = 1.0; // for dpsidx
+  for (int i_order = 0; i_order < b_vec_matrix_col_num; i_order++) {
+    deriv_order = deriv_order_arr[i_order];
+    b_vec_matrix[i_order][deriv_order] = 1.0; 
+  }
+//  b_vec_matrix[0][0] = 1.0; // for psi
+//  b_vec_matrix[1][1] = 1.0; // for dpsidx
 
  
 #ifdef DEBUG
@@ -159,7 +173,11 @@ int eval_psi_and_dpsidx_p(
     printf("%7.3f",x_arr[i_x_s_arr[i_row]]);
     for (int i_col = 0; i_col < N_s; i_col++) {
       printf("%7.3f", power_matrix[i_col][i_row]); 
-    } printf("%7.3f%7.3f", b_vec_matrix[0][i_row], b_vec_matrix[1][i_row]);
+    }
+    for (int i_o = 0; i_o < N_o; i_o++) {
+      printf("%7.3f", b_vec_matrix[i_o][i_row]);
+    }
+//    printf("%7.3f%7.3f", b_vec_matrix[0][i_row], b_vec_matrix[1][i_row]);
     printf("\n");
   }
 
@@ -186,40 +204,67 @@ int eval_psi_and_dpsidx_p(
 
 #ifdef DEBUG
 
-  printf("power_matrix_1d: ");
-  for (int i=0; i < N_s*N_s; i++) {
-    printf("%7.3f", power_matrix_1d[i]);
-  } printf("\n");
-  printf("coef_vec_matrix: ");
-  for (int i=0; i < N_s*b_vec_matrix_col_num; i++) {
-    printf("%7.3f", coef_vec_matrix[0][i]);
-  } printf("\n");
+//  printf("power_matrix_1d: ");
+//  for (int i=0; i < N_s*N_s; i++) {
+//    printf("%7.3f", power_matrix_1d[i]);
+//  } printf("\n");
+//  printf("coef_vec_matrix: ");
+//  for (int i=0; i < N_s*b_vec_matrix_col_num; i++) {
+//    printf("%7.3f", coef_vec_matrix[0][i]);
+//  } printf("\n");
 
 #endif // DEBUG
   
 
   //// Evaluate the finite-difference-approximated values: psi, dpsidx
-  *psi_p_arr_p = 0, *dpsidx_p_arr_p = 0;
-  for (int i_s = 0; i_s < N_s; i_s++) {
-    psi_x_s = psi_arr[i_x_s_arr[i_s]];
-    *psi_p_arr_p += coef_vec_matrix[0][i_s] * psi_x_s;
-    *dpsidx_p_arr_p += coef_vec_matrix[1][i_s] * psi_x_s;
-
+  for (int i_o = 0; i_o < N_o; i_o++) {
+    psi_deriv_p_arr[i_o] = 0.0;
+//    *psi_p_arr_p = 0, *dpsidx_p_arr_p = 0;
+    for (int i_s = 0; i_s < N_s; i_s++) {
+      psi_x_s = psi_arr[i_x_s_arr[i_s]];
+      psi_deriv_p_arr[i_o] += coef_vec_matrix[i_o][i_s] * psi_x_s;
+//      *dpsidx_p_arr_p += coef_vec_matrix[1][i_s] * psi_x_s;
 
 #ifdef DEBUG
-    printf(
-        "psi_x_s: %7.3f,"
-        " coef_vec_matrix[0][i_s]: %7.3f,"
-        " coef_vec_matrix[1][i_s]: %7.3f,"
-        " *psi_p_arr_p: %7.3f, *dpsidx_p_arr_p: %7.3f\n",
-        std::real(psi_x_s), 
-        coef_vec_matrix[0][i_s], 
-        coef_vec_matrix[1][i_s], 
-        std::real(*psi_p_arr_p), std::real(*dpsidx_p_arr_p)
-    );
+//    printf(
+//        "psi_x_s: %7.3f,"
+//        " coef_vec_matrix[0][i_s]: %7.3f,"
+//        " coef_vec_matrix[1][i_s]: %7.3f,"
+//        " *psi_p_arr_p: %7.3f, *dpsidx_p_arr_p: %7.3f\n",
+//        std::real(psi_x_s), 
+//        coef_vec_matrix[0][i_s], 
+//        coef_vec_matrix[1][i_s], 
+//        std::real(*psi_p_arr_p), std::real(*dpsidx_p_arr_p)
+//    );
 #endif // DEBUG
 
-  }
+    } // end for loop : i_o
+  } // end for loop : i_s
+
+  return EXIT_SUCCESS;
+}
+
+
+
+template <typename T>
+int eval_psi_and_dpsidx_p(
+    const double x_p, const T *psi_arr, const double *x_arr, 
+    const int N_s, const int N_x, const double *x_p_lim, 
+    T *psi_p_arr_p, T *dpsidx_p_arr_p) {
+  
+  const int N_o = 2;
+  const int deriv_order_arr[N_o] = { 0, 1 };
+  T psi_deriv_p_arr[N_o];
+
+  int return_code = EXIT_FAILURE;
+  return_code = eval_psi_deriv_p<T>(
+      x_p, psi_arr, x_arr, N_s, N_x, x_p_lim, N_o,
+      deriv_order_arr, psi_deriv_p_arr);
+  if (return_code != EXIT_SUCCESS)
+  { return debug_mesg("Failed to `eval_psi_deriv_p()`"); }
+  
+  *psi_p_arr_p = psi_deriv_p_arr[0];
+  *dpsidx_p_arr_p = psi_deriv_p_arr[1];
 
   return EXIT_SUCCESS;
 }
@@ -231,6 +276,10 @@ int eval_psi_and_dpsidx_arr(
     const double *x_p_arr, T *psi_arr, const double *x_arr, 
     const int N_s, const int N_p, const int N_x, const double *x_p_lim, 
     T *psi_p_arr, T *dpsidx_p_arr) {
+  
+  //// Check arguments
+  if ( !(N_s > 0 and N_x > N_s and N_p > 0) )
+  { return debug_mesg("Invalid argument"); }
 
   //// Function Arguments
   //
@@ -280,6 +329,17 @@ int eval_psi_and_dpsidx_arr(
 //// Instantiation
 
 // Instantiation of `eval_psi_and_dpsidx_p()` 
+template int eval_psi_deriv_p<double>(
+    const double x_p, const double *psi_arr, const double *x_arr, 
+    const int N_s, const int N_x, const double *x_p_lim, const int N_o,
+    const int *deriv_order_arr, double *psi_deriv_p_arr);
+
+template int eval_psi_deriv_p<std::complex<double>>(
+    const double x_p, const std::complex<double> *psi_arr, const double *x_arr, 
+    const int N_s, const int N_x, const double *x_p_lim, const int N_o,
+    const int *deriv_order_arr, std::complex<double> *psi_deriv_p_arr);
+
+// Instantiation of `eval_psi_and_dpsidx_p()` 
 template int eval_psi_and_dpsidx_p<double>(
     const double x_p, const double *psi_arr, const double *x_arr, 
     const int N_s, const int N_x, const double *x_p_lim, 
@@ -306,7 +366,7 @@ template int eval_psi_and_dpsidx_arr< std::complex<double> >(
 
 
 
-//// `eval_v_p_arr_for_sph_harm_basis`
+//// Implementation of `eval_v_p_for_sph_harm_basis`
 int eval_v_p_for_sph_harm_basis(
     const int N_s, const int N_rho, const int N_lm, 
     const double r_p_vec[DIM_R], 
@@ -314,7 +374,7 @@ int eval_v_p_for_sph_harm_basis(
     const double *rho_arr, int *l_arr, int *m_arr, const double *rho_p_lim, 
     double v_p_vec[DIM_R])
 {
-
+  
   //// Function Argument
   //
   // [NOTE]
@@ -432,7 +492,7 @@ int eval_v_p_for_sph_harm_basis(
     denum_p += psi_p * Ylm;
     numer_rho_p += dpsi_p * Ylm;
     numer_theta_p
-      += -cos(theta_p) * l * psi_p * Ylm
+      += -cos(theta_p) * (l+1.0) * psi_p * Ylm
       + sqrt( (2.0*l+1.0)/(2.0*l+3.0) * (l+1.0+m) * (l+1.0-m) )
         * psi_p * Yl1m;
     numer_phi_p += m * psi_p * Ylm;
@@ -523,7 +583,7 @@ int eval_v_p_for_sph_harm_basis(
           i_lm,std::real(_psi),std::imag(_psi));
     } fprintf(stderr,"\n");
 
-    return return_with_mesg("Zero 'psi_p' occurred"); 
+    return debug_mesg("Zero 'psi_p' occurred"); 
   }  // endif denum == 0
 
 
