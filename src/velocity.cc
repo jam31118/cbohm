@@ -371,7 +371,7 @@ int eval_v_p_for_sph_harm_basis(
 
   //// Declare variables
   std::complex<double> 
-    denum_p = 0, numer_rho_p = 0, numer_theta_p = 0, numer_phi_p = 0;
+    psi_p_Y = 0, dpsi_p_Y = 0, psi_p_dYdtheta = 0, psi_p_dYdphi = 0;
   double rho_p = r_p_vec[0], theta_p = r_p_vec[1], phi_p = r_p_vec[2];
   bool out_of_range;
 
@@ -389,25 +389,22 @@ int eval_v_p_for_sph_harm_basis(
   
   //// Define useful variables
   const double cos_theta_p = cos(theta_p);
+  const double sin_theta_p = sin(theta_p);
 
   //// Aliasing
   const std::complex<double> **psi_arr_arr = psi_in_sph_harm_basis_arr;
 
-
+  //// Determine the number of derivative orders to be evaluated
   const bool eval_jac = (jac != NULL);
   const int N_order_max = 3;
   int N_order;
   if (eval_jac) { N_order = N_order_max; }
   else { N_order = 2; }
   int deriv_order_arr[N_order];
-//  std::complex<double> psi_deriv_p_arr[N_order];
   deriv_order_arr[0] = 0, deriv_order_arr[1] = 1;
   if (eval_jac) { deriv_order_arr[2] = 2; }
 
-
-
   //// Allocate memory
-//  std::complex<double> *psi_p_lm_arr, *dpsi_p_lm_arr, *d2psi_p_lm_arr;
   std::complex<double> *Ylm_arr, *Yl1m_arr;
   std::complex<double> **psi_deriv_p_lm_arr;
   std::complex<double> *psi_deriv_p_lm_arr_1d;
@@ -423,25 +420,19 @@ int eval_v_p_for_sph_harm_basis(
       psi_deriv_p_lm_arr_p++, psi_deriv_p_lm_arr_1d_p += N_order_max) 
   { *psi_deriv_p_lm_arr_p = psi_deriv_p_lm_arr_1d_p; }
 
-
-//  psi_p_lm_arr = new std::complex<double>[N_lm];
-//  dpsi_p_lm_arr = new std::complex<double>[N_lm];
-//  if (eval_jac) { d2psi_p_lm_arr = new std::complex<double>[N_lm]; }
   Ylm_arr = new std::complex<double>[N_lm];
   Yl1m_arr = new std::complex<double>[N_lm];
 
-
   //// Variables to be used in loop
   int i_lm;
-//  const std::complex<double> *psi_arr;
   const std::complex<double> **psi_arr_p;
   int *l_p, *m_p;
   std::complex<double> exp_phi, Ylm, Yl1m, psi_p, dpsi_p;
   double l, m, m_power_of_minus_1;
   int li, mi, m_sign, m_abs;
 
-
-
+  
+  //// Evaluate Ylm etc. and store them into arrays
   for (
       i_lm = 0, psi_arr_p = psi_arr_arr, l_p=l_arr, m_p=m_arr;
       i_lm < N_lm;
@@ -455,26 +446,12 @@ int eval_v_p_for_sph_harm_basis(
     m_abs = m_sign * mi;
     m_power_of_minus_1 = 1.0 - 2.0 * (mi%2);
 
-//    psi_arr = *psi_arr_p;
-//    printf("before eval_psi_deriv_p()\n");
-
-    //// Estimate `psi_p` and `dpsidrho_p` using finite difference
+    //// Estimate `psi_p` and `dpsidrho_p` (and more) using finite difference
     return_code = eval_psi_deriv_p< std::complex<double> >(
         rho_p, *psi_arr_p, rho_arr, N_s, N_rho, rho_p_lim, N_order,
         deriv_order_arr, psi_deriv_p_lm_arr[i_lm]);
-//    return_code = eval_psi_deriv_p< std::complex<double> >(
-//        rho_p, psi_arr, rho_arr, N_s, N_rho, rho_p_lim, N_order,
-//        deriv_order_arr, psi_deriv_p_arr);
-//    return_code = eval_psi_and_dpsidx_p< std::complex<double> >(
-//        rho_p, psi_arr, rho_arr,
-//        N_s, N_rho, rho_p_lim,
-//        &psi_p, &dpsi_p);
     if (return_code != EXIT_SUCCESS)
     { return debug_mesg("Failed to 'eval_psi_and_dpsidx_p()'"); }
-
-    
-//    psi_p = psi_deriv_p_arr[0], dpsi_p = psi_deriv_p_arr[1];
-
 
     //// Evaluate ingredients
     exp_phi = std::complex<double>(cos(m_abs*phi_p), sin(m_abs*phi_p));
@@ -484,13 +461,15 @@ int eval_v_p_for_sph_harm_basis(
       Ylm = m_power_of_minus_1 * std::conj(Ylm);
       Yl1m = m_power_of_minus_1 * std::conj(Yl1m);
     }
-
+    
+    //// Store results to arrays
     Ylm_arr[i_lm] = Ylm;
     Yl1m_arr[i_lm] = Yl1m;
 
   } // end for loop : `i_lm`
   
 
+  //// Evaluate summations for velocity (and, if specified, also the jacobian)
   for (
       i_lm = 0, l_p=l_arr, m_p=m_arr;
       i_lm < N_lm;
@@ -503,13 +482,16 @@ int eval_v_p_for_sph_harm_basis(
     dpsi_p = psi_deriv_p_lm_arr[i_lm][1];
 
     //// Add to target summations
-    denum_p += psi_p * Ylm;
-    numer_rho_p += dpsi_p * Ylm;
-    numer_theta_p
+    psi_p_Y += psi_p * Ylm;
+    dpsi_p_Y += dpsi_p * Ylm;
+
+    psi_p_dYdtheta
       += - cos_theta_p * (l+1.0) * psi_p * Ylm
       + sqrt( (2.0*l+1.0)/(2.0*l+3.0) * (l+1.0+m) * (l+1.0-m) )
         * psi_p * Yl1m;
-    numer_phi_p += m * psi_p * Ylm;
+    psi_p_dYdtheta /= sin_theta_p;
+
+    psi_p_dYdphi += m * psi_p * Ylm;
     
   } // i_lm
 
@@ -518,9 +500,6 @@ int eval_v_p_for_sph_harm_basis(
   //// Deallocate arrays after use
   delete [] psi_deriv_p_lm_arr_1d;
   delete [] psi_deriv_p_lm_arr;
-//  delete [] psi_p_lm_arr;
-//  delete [] dpsi_p_lm_arr;
-//  if (eval_jac) { delete [] d2psi_p_lm_arr; }
   delete [] Ylm_arr;
   delete [] Yl1m_arr;
 
@@ -534,8 +513,8 @@ int eval_v_p_for_sph_harm_basis(
       "denum","numer_p_rho","numer_p_theta","numer_p_phi");
 
   printf("%15.7f%15.7f%15.7f%15.7f\n",
-      std::real(denum_p), std::real(numer_rho_p),
-      std::real(numer_theta_p), std::real(numer_phi_p));
+      std::real(psi_p_Y), std::real(dpsi_p_Y),
+      std::real(psi_p_dYdtheta), std::real(psi_p_dYdphi));
   printf("\n");
 
 
@@ -546,8 +525,8 @@ int eval_v_p_for_sph_harm_basis(
       "denum","numer_p_rho","numer_p_theta","numer_p_phi");
 
   printf("%15.7f%15.7f%15.7f%15.7f\n",
-      std::imag(denum_p), std::imag(numer_rho_p),
-      std::imag(numer_theta_p), std::imag(numer_phi_p));
+      std::imag(psi_p_Y), std::imag(dpsi_p_Y),
+      std::imag(psi_p_dYdtheta), std::imag(psi_p_dYdphi));
   printf("\n");
 
 #endif // DEBUG
@@ -560,11 +539,11 @@ int eval_v_p_for_sph_harm_basis(
       
 
   // Check singularity
-  if (denum_p == 0.0) { 
+  if (psi_p_Y == 0.0) { 
 
-    fprintf(stderr,"[ LOG ] %-25s\n","denum_p_arr: ");
+    fprintf(stderr,"[ LOG ] %-25s\n","psi_p_Y_arr: ");
     fprintf(stderr,"(%20s,%20s)\n","real","imag");
-    fprintf(stderr,"(%20.15f,%20.15f)\n",denum_p.real(),denum_p.imag());
+    fprintf(stderr,"(%20.15f,%20.15f)\n",psi_p_Y.real(),psi_p_Y.imag());
 
     fprintf(stderr,"\n");
 
@@ -611,15 +590,15 @@ int eval_v_p_for_sph_harm_basis(
 
   //// Evaluate velocity if not singular
   v_p_vec[0]
-    = (numer_rho_p / denum_p).imag();
+    = (dpsi_p_Y / psi_p_Y).imag();
 
   v_p_vec[1]
-    = (numer_theta_p / denum_p).imag()
-    / (rho_p * sin(theta_p));
+    = (psi_p_dYdtheta / psi_p_Y).imag()
+    / (rho_p);
 
   v_p_vec[2] 
-    = (numer_phi_p / denum_p).real()
-    / (rho_p * sin(theta_p));
+    = (psi_p_dYdphi / psi_p_Y).real()
+    / (rho_p * sin_theta_p);
 
 
 #ifdef DEBUG
