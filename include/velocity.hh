@@ -44,21 +44,25 @@ int eval_v_p_for_sph_harm_basis(
     const int N_s, const int N_rho, const int N_lm, 
     const double r_p_vec[DIM_R], 
     const std::complex<double> **psi_in_sph_harm_basis_arr,
-    const double *rho_arr, int *l_arr, int *m_arr, const double *rho_p_lim, 
+    const double *rho_arr, const int *l_arr, const int *m_arr, 
+    const double *rho_p_lim, 
     double v_p_vec[DIM_R], double jac[DIM_R][DIM_R]=NULL);
 
 
 int eval_v_p_vec_arr_for_sph_harm_basis(
     const int N_s, const int N_p, const int N_rho, const int N_lm,
-    double **r_p_vec_arr, const std::complex<double> **psi_in_sph_harm_basis_arr,
-    double *rho_arr, int *l_arr, int *m_arr, const double *rho_p_lim, 
+    double **r_p_vec_arr, 
+    const std::complex<double> **psi_in_sph_harm_basis_arr,
+    const double *rho_arr, const int *l_arr, const int *m_arr, 
+    const double *rho_p_lim, 
     double **v_p_vec_arr, jac_t *jac_p_arr=NULL);
 
 
 int eval_v_p_arr_for_sph_harm_basis(
     const int N_s, const int N_p, const int N_rho, const int N_lm,
     double **r_p_arr, const std::complex<double> **psi_in_sph_harm_basis_arr,
-    double *rho_arr, int *l_arr, int *m_arr, const double *rho_p_lim, 
+    const double *rho_arr, const int *l_arr, const int *m_arr, 
+    const double *rho_p_lim, 
     double **v_p_arr, jac_t *jac_p_arr=NULL);
 
 

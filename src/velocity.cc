@@ -334,7 +334,8 @@ int eval_v_p_for_sph_harm_basis(
     const int N_s, const int N_rho, const int N_lm, 
     const double r_p_vec[DIM_R], 
     const std::complex<double> **psi_in_sph_harm_basis_arr,
-    const double *rho_arr, int *l_arr, int *m_arr, const double *rho_p_lim, 
+    const double *rho_arr, const int *l_arr, const int *m_arr, 
+    const double *rho_p_lim, 
     double v_p_vec[DIM_R], double jac[DIM_R][DIM_R])
 {
   
@@ -432,7 +433,7 @@ int eval_v_p_for_sph_harm_basis(
   //// Variables to be used in loop
   int i_lm;
   const std::complex<double> **psi_arr_p;
-  int *l_p, *l_p_max, *m_p;
+  const int *l_p, *l_p_max, *m_p;
   std::complex<double> 
     exp_phi, Ylm, Yl1m, dtheta_Ylm, 
     psi_p, dpsi_p, d2psi_p, *p_Ylm, *p_Yl1m, *p_dtheta_Ylm;
@@ -706,8 +707,10 @@ int eval_v_p_for_sph_harm_basis(
 //// `eval_v_p_vec_arr_for_sph_harm_basis`
 int eval_v_p_vec_arr_for_sph_harm_basis(
     const int N_s, const int N_p, const int N_rho, const int N_lm,
-    double **r_p_vec_arr, const std::complex<double> **psi_in_sph_harm_basis_arr,
-    double *rho_arr, int *l_arr, int *m_arr, const double *rho_p_lim, 
+    double **r_p_vec_arr, 
+    const std::complex<double> **psi_in_sph_harm_basis_arr,
+    const double *rho_arr, const int *l_arr, const int *m_arr, 
+    const double *rho_p_lim, 
     double **v_p_vec_arr, jac_t *jac_p_arr)
 {
 
@@ -767,7 +770,8 @@ int eval_v_p_vec_arr_for_sph_harm_basis(
 int eval_v_p_arr_for_sph_harm_basis(
     const int N_s, const int N_p, const int N_rho, const int N_lm,
     double **r_p_arr, const std::complex<double> **psi_in_sph_harm_basis_arr,
-    double *rho_arr, int *l_arr, int *m_arr, const double *rho_p_lim, 
+    const double *rho_arr, const int *l_arr, const int *m_arr, 
+    const double *rho_p_lim, 
     double **v_p_arr, jac_t *jac_p_arr)
 {
 
