@@ -27,8 +27,6 @@ int prop_implicit_euler_in_sph_harm_basis(
   //
   // [INPUT/OUTPUT]
   // `r_p_t_vec`: position vector of a particle of shape (`DIM_R`,)
-  //
-  // [OUTPUT]
   
 
   //== Description ==
@@ -36,78 +34,87 @@ int prop_implicit_euler_in_sph_harm_basis(
   // Target function g(r), of root-finding with respect to 'r'
   //
   // g(r) = r - r_n - h*v(t_{n+1},r)
+  // 
+  // J_g = ( I - h*J_v )
   //
-  // ( I - h*J_v ) delta_r = - g(r)
+  // J_v * delta_r = - g(r)
   //
   //=================
   
-
+ 
+  //// Check argument
   if (thres <= 0.0)
   { return debug_mesg("invalid argument(s)"); }
 
+
+  //// Declare variables
   int return_code = EXIT_FAILURE;
   
-  vec_t v_p_vec;
-  jac_t jac_v;
-  jac_t jac_g;
-  vec_t negative_g;
+  vec_t v_p_vec, negative_g, r_p_vec;
   double *delta_r_p_vec;
+  jac_t jac_v, jac_g;
 
-  double r_p_vec[DIM_R];
-  const int n = DIM_R;
-  const int nrhs = 1;
-  int ipiv[n];
-  int gesv_info;
+  const int n = DIM_R, nrhs = 1;
+  int ipiv[n], gesv_info;
+
 
   //// Initialize `r_p_vec`
   for (int i_dim=0; i_dim < DIM_R; i_dim++)
   { r_p_vec[i_dim] = r_p_t_vec[i_dim]; }
 
 
+  //// Iteration starts here
   int i_iter;
   for (i_iter = 0; i_iter < NEWTON_ITER_MAX; i_iter++) {
 
+    //// Evaluate velocity vector and Jacobian of vector
     eval_v_p_for_sph_harm_basis(
         N_s, N_rho, N_lm, r_p_vec, psi_t_next_arr_arr, rho_arr, 
-        l_arr, m_arr, rho_p_lim, v_p_vec, jac_v
-        );
+        l_arr, m_arr, rho_p_lim, v_p_vec, jac_v);
   
+    //// Evaluate negative_g array (the right hand side of linear system eq.)
     for (int i_dim = 0; i_dim < DIM_R; i_dim++) {
       negative_g[i_dim] = - (
           r_p_vec[i_dim] - r_p_t_vec[i_dim] - delta_t*v_p_vec[i_dim]);
     }
     
-//    printf("[i_iter=%d] norm of `negative_g`: %.20f / r_p_vec=[%.20f,%.20f,%.20f]\n", 
-//        i_iter, vec_norm(negative_g), r_p_vec[0], r_p_vec[1], r_p_vec[2]);
+    //// Terminate iteration
     if (vec_norm(negative_g) < thres) { break; }
   
+    //// Evaluate Jacobian for function 'g'
     for (int i_row = 0; i_row < DIM_R; i_row++) {
       for (int i_col = 0; i_col < DIM_R; i_col++) {
         jac_g[i_col][i_row] = (i_row==i_col) + delta_t * jac_v[i_row][i_col];
       }
     }
   
+    //// Solve linear system (Jacobian of 'g') to get delta_r_p_vec
     dgesv_(&n, &nrhs, jac_g[0], &n, ipiv, negative_g, &n, &gesv_info);
     return_code = handle_gesv_info(gesv_info);
     if (return_code != EXIT_SUCCESS)
     { return debug_mesg("Failed during checking `Xgesv_` info"); }
   
+    //// aliasing
     delta_r_p_vec = negative_g;
   
     for (int i_dim = 0; i_dim < DIM_R; i_dim++) {
       r_p_vec[i_dim] += delta_r_p_vec[i_dim];
-    }
+    } // end-for-loop : `i_dim`
 
-  }
+  } // end-for-loop : `i_iter`
+
 
   for (int i_dim = 0; i_dim < DIM_R; i_dim++) {
     r_p_t_vec[i_dim] = r_p_vec[i_dim];
-  }
+  } // end-for-loop : `i_dim`
+
 
   //// Check whether the number of iteration has been exceeded a given value
   if (i_iter >= NEWTON_ITER_MAX) 
   { return debug_mesg("NEWTON_ITER_MAX exceeded"); }
 
+  //// Return if everything is alright
   return EXIT_SUCCESS;
+
 }
 
