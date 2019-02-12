@@ -59,7 +59,7 @@ int eval_v_p_arr_for_sph_harm_basis(
     const int N_s, const int N_p, const int N_rho, const int N_lm,
     double **r_p_arr, const std::complex<double> **psi_in_sph_harm_basis_arr,
     double *rho_arr, int *l_arr, int *m_arr, const double *rho_p_lim, 
-    double **v_p_arr);
+    double **v_p_arr, jac_t *jac_p_arr=NULL);
 
 
 #endif // _VELOCITY_HH_
