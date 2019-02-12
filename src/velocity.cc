@@ -371,7 +371,11 @@ int eval_v_p_for_sph_harm_basis(
 
   //// Declare variables
   std::complex<double> 
-    psi_p_Y = 0, dpsi_p_Y = 0, psi_p_dYdtheta = 0, psi_p_dYdphi = 0;
+    psi_p_Y = 0, dpsi_p_Y = 0, psi_p_dtheta_Y = 0, psi_p_dphi_Y = 0,
+    d2psi_p_Y = 0, dpsi_p_dtheta_Y = 0, dpsi_p_dphi_Y = 0, psi_p_d2theta_Y = 0,
+    psi_p_dphi_dtheta_Y = 0, psi_p_d2phi_Y = 0;
+//    psi_p_dtheta_dphi_Y = 0, 
+
   double rho_p = r_p_vec[0], theta_p = r_p_vec[1], phi_p = r_p_vec[2];
   bool out_of_range;
 
@@ -390,6 +394,7 @@ int eval_v_p_for_sph_harm_basis(
   //// Define useful variables
   const double cos_theta_p = cos(theta_p);
   const double sin_theta_p = sin(theta_p);
+  const double cot_theta_p = cos_theta_p / sin_theta_p;
 
   //// Aliasing
   const std::complex<double> **psi_arr_arr = psi_in_sph_harm_basis_arr;
@@ -405,7 +410,7 @@ int eval_v_p_for_sph_harm_basis(
   if (eval_jac) { deriv_order_arr[2] = 2; }
 
   //// Allocate memory
-  std::complex<double> *Ylm_arr, *Yl1m_arr;
+  std::complex<double> *Ylm_arr, *Yl1m_arr, *dtheta_Ylm_arr;
   std::complex<double> **psi_deriv_p_lm_arr;
   std::complex<double> *psi_deriv_p_lm_arr_1d;
   std::complex<double> **psi_deriv_p_lm_arr_p, **psi_deriv_p_lm_arr_p_max;
@@ -422,21 +427,25 @@ int eval_v_p_for_sph_harm_basis(
 
   Ylm_arr = new std::complex<double>[N_lm];
   Yl1m_arr = new std::complex<double>[N_lm];
+  dtheta_Ylm_arr = new std::complex<double>[N_lm];
 
   //// Variables to be used in loop
   int i_lm;
   const std::complex<double> **psi_arr_p;
   int *l_p, *m_p;
-  std::complex<double> exp_phi, Ylm, Yl1m, psi_p, dpsi_p;
+  std::complex<double> 
+    exp_phi, Ylm, Yl1m, dtheta_Ylm, 
+    psi_p, dpsi_p, d2psi_p, *p_Ylm, *p_Yl1m, *p_dtheta_Ylm;
   double l, m, m_power_of_minus_1;
   int li, mi, m_sign, m_abs;
 
   
   //// Evaluate Ylm etc. and store them into arrays
   for (
-      i_lm = 0, psi_arr_p = psi_arr_arr, l_p=l_arr, m_p=m_arr;
+      i_lm = 0, psi_arr_p = psi_arr_arr, l_p=l_arr, m_p=m_arr, 
+      p_Ylm=Ylm_arr, p_Yl1m = Yl1m_arr, p_dtheta_Ylm = dtheta_Ylm_arr;
       i_lm < N_lm;
-      i_lm++, psi_arr_p++, l_p++, m_p++
+      i_lm++, psi_arr_p++, l_p++, m_p++, p_Ylm++, p_Yl1m++, p_dtheta_Ylm++
       ) 
   {
 
@@ -463,37 +472,80 @@ int eval_v_p_for_sph_harm_basis(
     }
     
     //// Store results to arrays
-    Ylm_arr[i_lm] = Ylm;
-    Yl1m_arr[i_lm] = Yl1m;
+    *p_Ylm = Ylm;
+    *p_Yl1m = Yl1m;
+    *p_dtheta_Ylm = (
+        - cos_theta_p * (l+1.0) * Ylm
+        + sqrt( (2.0*l+1.0)/(2.0*l+3.0) * (l+1.0+m) * (l+1.0-m) ) * Yl1m
+        ) / sin_theta_p;
 
   } // end for loop : `i_lm`
-  
 
-  //// Evaluate summations for velocity (and, if specified, also the jacobian)
+
+  //// Evaluate summations for velocity 
   for (
-      i_lm = 0, l_p=l_arr, m_p=m_arr;
+      i_lm = 0, l_p=l_arr, m_p=m_arr, 
+      p_Ylm = Ylm_arr, p_Yl1m = Yl1m_arr, p_dtheta_Ylm = dtheta_Ylm_arr,
+      psi_deriv_p_lm_arr_1d_p = psi_deriv_p_lm_arr_1d;
       i_lm < N_lm;
-      i_lm++, l_p++, m_p++
-      ) 
+      i_lm++, l_p++, m_p++, psi_deriv_p_lm_arr_1d_p += N_order_max,
+      p_Ylm++, p_Yl1m++, p_dtheta_Ylm++
+      )
   {
     l = (double) *l_p; m = (double) *m_p;
-    Ylm = Ylm_arr[i_lm]; Yl1m = Yl1m_arr[i_lm];
-    psi_p = psi_deriv_p_lm_arr[i_lm][0];
-    dpsi_p = psi_deriv_p_lm_arr[i_lm][1];
+    Ylm = *p_Ylm; Yl1m = *p_Yl1m; dtheta_Ylm = *p_dtheta_Ylm;
+    psi_p = *(psi_deriv_p_lm_arr_1d_p);
+    dpsi_p = *(psi_deriv_p_lm_arr_1d_p+1);
 
     //// Add to target summations
     psi_p_Y += psi_p * Ylm;
     dpsi_p_Y += dpsi_p * Ylm;
 
-    psi_p_dYdtheta
-      += - cos_theta_p * (l+1.0) * psi_p * Ylm
-      + sqrt( (2.0*l+1.0)/(2.0*l+3.0) * (l+1.0+m) * (l+1.0-m) )
-        * psi_p * Yl1m;
-    psi_p_dYdtheta /= sin_theta_p;
+    psi_p_dtheta_Y += psi_p * dtheta_Ylm;
+//      += - cos_theta_p * (l+1.0) * psi_p * Ylm
+//      + sqrt( (2.0*l+1.0)/(2.0*l+3.0) * (l+1.0+m) * (l+1.0-m) )
+//        * psi_p * Yl1m;
+//    psi_p_dtheta_Y /= sin_theta_p;
 
-    psi_p_dYdphi += m * psi_p * Ylm;
+    psi_p_dphi_Y += m * psi_p * Ylm;
     
   } // i_lm
+  
+
+
+  std::complex<double> d2theta_Y;
+  //// Evaluate summations for evaluating Jacobian
+  if (eval_jac) {
+    
+    for (
+        i_lm = 0, l_p=l_arr, m_p=m_arr, 
+        p_Ylm = Ylm_arr, p_Yl1m = Yl1m_arr, p_dtheta_Ylm = dtheta_Ylm_arr,
+        psi_deriv_p_lm_arr_1d_p = psi_deriv_p_lm_arr_1d;
+        i_lm < N_lm;
+        i_lm++, l_p++, m_p++, psi_deriv_p_lm_arr_1d_p += N_order_max,
+        p_Ylm++, p_Yl1m++, p_dtheta_Ylm++
+        )
+    {
+      l = (double) *l_p; m = (double) *m_p;
+      Ylm = *p_Ylm; Yl1m = *p_Yl1m; dtheta_Ylm = *p_dtheta_Ylm;
+      d2theta_Y = 
+        - cot_theta_p * dtheta_Ylm 
+        - ( l*(l+1) - m*m/(sin_theta_p*sin_theta_p) ) * Ylm;
+      psi_p = *(psi_deriv_p_lm_arr_1d_p);
+      dpsi_p = *(psi_deriv_p_lm_arr_1d_p+1);
+      d2psi_p = *(psi_deriv_p_lm_arr_1d_p+2);
+  
+      d2psi_p_Y += d2psi_p * Ylm;
+      dpsi_p_dtheta_Y += dpsi_p * dtheta_Ylm;
+      dpsi_p_dphi_Y += dpsi_p * m * Ylm;
+      psi_p_d2theta_Y += psi_p * d2theta_Y;
+      psi_p_dphi_dtheta_Y += psi_p * m * dtheta_Ylm;
+//      psi_p_dtheta_dphi_Y += psi_p * m * dtheta_Ylm;
+      psi_p_d2phi_Y += psi_p * m * m * Ylm;
+  
+    } // i_lm
+
+  } // end if : `eval_jac`
 
 
 
@@ -502,6 +554,7 @@ int eval_v_p_for_sph_harm_basis(
   delete [] psi_deriv_p_lm_arr;
   delete [] Ylm_arr;
   delete [] Yl1m_arr;
+  delete [] dtheta_Ylm_arr;
 
 
 #ifdef DEBUG
@@ -514,7 +567,7 @@ int eval_v_p_for_sph_harm_basis(
 
   printf("%15.7f%15.7f%15.7f%15.7f\n",
       std::real(psi_p_Y), std::real(dpsi_p_Y),
-      std::real(psi_p_dYdtheta), std::real(psi_p_dYdphi));
+      std::real(psi_p_dtheta_Y), std::real(psi_p_dphi_Y));
   printf("\n");
 
 
@@ -526,7 +579,7 @@ int eval_v_p_for_sph_harm_basis(
 
   printf("%15.7f%15.7f%15.7f%15.7f\n",
       std::imag(psi_p_Y), std::imag(dpsi_p_Y),
-      std::imag(psi_p_dYdtheta), std::imag(psi_p_dYdphi));
+      std::imag(psi_p_dtheta_Y), std::imag(psi_p_dphi_Y));
   printf("\n");
 
 #endif // DEBUG
@@ -593,11 +646,11 @@ int eval_v_p_for_sph_harm_basis(
     = (dpsi_p_Y / psi_p_Y).imag();
 
   v_p_vec[1]
-    = (psi_p_dYdtheta / psi_p_Y).imag()
+    = (psi_p_dtheta_Y / psi_p_Y).imag()
     / (rho_p);
 
   v_p_vec[2] 
-    = (psi_p_dYdphi / psi_p_Y).real()
+    = (psi_p_dphi_Y / psi_p_Y).real()
     / (rho_p * sin_theta_p);
 
 
@@ -607,10 +660,100 @@ int eval_v_p_for_sph_harm_basis(
 #endif // DEBUG
 
 
+  //// Evaluate Jacobian
+  const std::complex<double> psi_p_Y_sq = psi_p_Y * psi_p_Y;
+  if (eval_jac) {
+    jac[0][0] = ( d2psi_p_Y / psi_p_Y - (dpsi_p_Y*dpsi_p_Y)/(psi_p_Y_sq) ).imag();
+    jac[0][1] = ( dpsi_p_dtheta_Y / psi_p_Y - dpsi_p_Y*psi_p_dtheta_Y/(psi_p_Y_sq) ).imag();
+    jac[0][2] = ( dpsi_p_dphi_Y / psi_p_Y - dpsi_p_Y * psi_p_dphi_Y / (psi_p_Y_sq) ).imag();
+//    jac[1][0] = (-v_p_vec[0] + dpsi_p_dtheta_Y/psi_p_Y - (psi_p_dtheta_Y*dpsi_p_Y)/psi_p_Y_sq).imag() / rho_p;
+    jac[1][0] = (-v_p_vec[1] + jac[0][1]) / rho_p;
+    jac[1][1] = ( psi_p_d2theta_Y / psi_p_Y - psi_p_dtheta_Y*psi_p_dtheta_Y/psi_p_Y_sq ).imag() / rho_p;
+    jac[1][2] = ( psi_p_dphi_dtheta_Y / psi_p_Y - psi_p_dtheta_Y*psi_p_dphi_Y / psi_p_Y_sq ).imag() / rho_p;
+    jac[2][0] = - 1.0 / rho_p * (v_p_vec[2] + 1.0 / sin_theta_p * jac[0][2]);
+    jac[2][1] = - cot_theta_p * v_p_vec[2] + 1.0 / sin_theta_p * jac[1][2];
+    jac[2][2] = ( psi_p_d2phi_Y / psi_p_Y - psi_p_dphi_Y*psi_p_dphi_Y / psi_p_Y_sq ).imag() / (rho_p * sin_theta_p);
+  }
+
   //// Return from thie program
   return EXIT_SUCCESS;
 
 }
+
+
+
+
+//// `eval_v_p_vec_arr_for_sph_harm_basis`
+int eval_v_p_vec_arr_for_sph_harm_basis(
+    const int N_s, const int N_p, const int N_rho, const int N_lm,
+    double **r_p_vec_arr, const std::complex<double> **psi_in_sph_harm_basis_arr,
+    double *rho_arr, int *l_arr, int *m_arr, const double *rho_p_lim, 
+    double **v_p_vec_arr, jac_t *jac_p_arr)
+{
+
+  //// Function Argument
+  //
+  // [NOTE]
+  // `DIM_R` : the dimension of paritlce's position vector space
+  //
+  // [INPUT]
+  // `N_s` : the number of stencils used in finite-difference approximation
+  //         for estimating psi and dpsidrho at particle's radial coodinate
+  // `N_p` : the number of particles
+  // `N_rho` : the number of radial grid points
+  // `N_lm` : the number of spherical harmonics basis
+  //
+  // `r_p_vec_arr` : 2D array of shape (`N_p`,`DIM_R`)
+  // `psi_in_sph_harm_basis_arr` : 2D array of shape (`N_lm`,`N_rho`)
+  // `rho_arr` : 1D array of shape (`N_rho`,)
+  // `l_arr` : 1D array of shape (`l_arr`,)
+  // `m_arr` : 1D array of shape (`m_arr`,)
+  // `rho_p_lim` : 1D array of shape (2,)
+  //
+  // [OUTPUT]
+  // `v_p_vec_arr` : 2D array of shape (`N_p`,`DIM_R`)
+  //
+
+  int return_code = EXIT_FAILURE;
+
+//  if (jac_p_arr == NULL) {
+//    jac_p_arr = new jac_t[N_p];
+//    for (int i_p = 0; i_p < N_p; i_p++) {
+//      jac_p_arr[i_p] = NULL;
+//    }
+//  }
+//
+//  jac_t jac_p;
+//  double r_p_vec[DIM_R], v_p_vec[DIM_R];
+
+  for (int i_p = 0; i_p < N_p; i_p++) {
+
+//    for (int i_dim = 0; i_dim < DIM_R; i_dim++)
+//    { r_p_vec[i_dim] = r_p_arr[i_dim][i_p]; }
+    if (jac_p_arr == NULL) { // { jac_p = jac_p_arr[i_p]; }
+      return_code = eval_v_p_for_sph_harm_basis(
+          N_s, N_rho, N_lm, r_p_vec_arr[i_p], psi_in_sph_harm_basis_arr,
+          rho_arr, l_arr, m_arr, rho_p_lim, v_p_vec_arr[i_p]);
+
+    } else {
+      return_code = eval_v_p_for_sph_harm_basis(
+          N_s, N_rho, N_lm, r_p_vec_arr[i_p], psi_in_sph_harm_basis_arr,
+          rho_arr, l_arr, m_arr, rho_p_lim, v_p_vec_arr[i_p], jac_p_arr[i_p]);
+    
+    }
+
+    if (return_code != EXIT_SUCCESS) 
+    { return debug_mesg("Failed during 'eval_v_p_for_sph_harm_basis()'"); }
+
+//    for (int i_dim = 0; i_dim < DIM_R; i_dim++)
+//    { v_p_arr[i_dim][i_p] = v_p_vec[i_dim]; }
+
+  } // for-loop : i_p
+
+  return EXIT_SUCCESS;
+
+}
+
 
 
 
