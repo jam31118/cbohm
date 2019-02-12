@@ -4,6 +4,16 @@
 #include "gsl/gsl_sf_legendre.h"
 
 
+double vec_norm(vec_t vec) {
+  double _norm = 0.0;
+  for (int i=0; i<DIM_R; i++) {
+    _norm += vec[i] * vec[i];
+  }
+  return sqrt(_norm);
+}
+
+
+
 int eval_shift_offset(
     const int num_of_stencils, const int i_x_s_at_nls, 
     const int N_x, int *const offset) {

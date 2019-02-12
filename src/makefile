@@ -8,7 +8,7 @@ all: install
 
 install: $(LIB_DIR)/libcbohm.so
 
-$(LIB_DIR)/libcbohm.so: velocity.o log.o lapack.o lm.o hydrogen.o
+$(LIB_DIR)/libcbohm.so: velocity.o log.o lapack.o lm.o hydrogen.o ode.o
 	mkdir -p $(LIB_DIR)
 	$(CXX) -shared -fPIC $^ -o $@ $(LAPACK_LIB_FLAGS) $(GSL_LIB_FLAGS) $(QPROP_LIB_FLAGS)
 
@@ -29,6 +29,9 @@ lm.o: lm.cc
 
 hydrogen.o: hydrogen.cc
 	$(CXX) -fPIC -c $< -o $@ $(OPTIMIZE_FLAGS) $(DEBUG_FLAGS) $(QPROP_INC_FLAGS)
+
+ode.o: ode.cc
+	$(CXX) -fPIC -c $< -o $@ $(OPTIMIZE_FLAGS) $(DEBUG_FLAGS)
 
 clean:
 	$(RM) -f *.a *.o *.so $(LIB_DIR)/*.so $(LIB_DIR)/*.a

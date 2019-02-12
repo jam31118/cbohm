@@ -13,10 +13,10 @@
 
 #include <cmath>
 
-#define CODE_OUT_OF_RANGE 256
-#define DIM_R 3
+#include "velocity-def.hh"
 
-typedef double jac_t[DIM_R][DIM_R];
+
+double vec_norm(vec_t vec);
 
 
 template <typename T>
