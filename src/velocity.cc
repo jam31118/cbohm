@@ -432,14 +432,20 @@ int eval_v_p_for_sph_harm_basis(
   //// Variables to be used in loop
   int i_lm;
   const std::complex<double> **psi_arr_p;
-  int *l_p, *m_p;
+  int *l_p, *l_p_max, *m_p;
   std::complex<double> 
     exp_phi, Ylm, Yl1m, dtheta_Ylm, 
     psi_p, dpsi_p, d2psi_p, *p_Ylm, *p_Yl1m, *p_dtheta_Ylm;
   double l, m, m_power_of_minus_1;
   int li, mi, m_sign, m_abs;
+  bool inconsistent_l_m = true;
 
+
+  //// Check whether there is any negative l value
+  for (l_p=l_arr, l_p_max=l_arr+N_lm; l_p<l_p_max; l_p++) 
+  { if (*l_p < 0) { return debug_mesg("negative l value found"); } }
   
+
   //// Evaluate Ylm etc. and store them into arrays
   for (
       i_lm = 0, psi_arr_p = psi_arr_arr, l_p=l_arr, m_p=m_arr, 
@@ -450,6 +456,7 @@ int eval_v_p_for_sph_harm_basis(
   {
 
     li = *l_p, mi = *m_p;
+    inconsistent_l_m = (mi > li or mi < -li);
     l = (double) li; m = (double) mi;
     m_sign = 1 - 2 * (1 - (mi>=0));
     m_abs = m_sign * mi;
@@ -461,6 +468,17 @@ int eval_v_p_for_sph_harm_basis(
         deriv_order_arr, psi_deriv_p_lm_arr[i_lm]);
     if (return_code != EXIT_SUCCESS)
     { return debug_mesg("Failed to 'eval_psi_and_dpsidx_p()'"); }
+
+    //// Deal with the case where the |m|>l, possibly by qprop-dim == 34
+    if (inconsistent_l_m) {
+      for (int i_order=0; i_order < N_order; i_order++) {
+        if (psi_deriv_p_lm_arr[i_lm][i_order] != 0.0) {
+          return debug_mesg(
+              "non zero psi_deriv values when l and m are inconsistent");
+        }
+      }
+      continue;
+    }
 
     //// Evaluate ingredients
     exp_phi = std::complex<double>(cos(m_abs*phi_p), sin(m_abs*phi_p));
