@@ -194,7 +194,7 @@ int eval_psi_deriv_p(
   );
   if ( handle_gesv_info(gesv_info) != EXIT_SUCCESS)
   { return return_with_mesg("Failed solving for coeffcients"); }
-
+  
   //// Evaluate the finite-difference-approximated values: psi, dpsidx
   for (int i_o = 0; i_o < N_o; i_o++) {
     psi_deriv_p_arr[i_o] = 0.0;
@@ -335,7 +335,7 @@ int eval_v_p_for_sph_harm_basis(
     const double r_p_vec[DIM_R], 
     const std::complex<double> **psi_in_sph_harm_basis_arr,
     const double *rho_arr, int *l_arr, int *m_arr, const double *rho_p_lim, 
-    double v_p_vec[DIM_R])
+    double v_p_vec[DIM_R], double jac[DIM_R][DIM_R])
 {
   
   //// Function Argument
@@ -364,27 +364,82 @@ int eval_v_p_for_sph_harm_basis(
   if ( !(N_s > 0 and N_rho > N_s and N_lm > 0) )
   { return debug_mesg("Invalid argument"); }
 
+  
   //// Define useful variables
   const double rho_p_min = rho_p_lim[0], rho_p_max = rho_p_lim[1];
   int return_code = EXIT_FAILURE;
 
-  //// Aliasing
-  const std::complex<double> **psi_arr_arr = psi_in_sph_harm_basis_arr;
-
   //// Declare variables
   std::complex<double> 
     denum_p = 0, numer_rho_p = 0, numer_theta_p = 0, numer_phi_p = 0;
-
   double rho_p = r_p_vec[0], theta_p = r_p_vec[1], phi_p = r_p_vec[2];
+  bool out_of_range;
+
+  //// Check singularity
+  if (rho_p == 0 or sin(theta_p) == 0) 
+  { return debug_mesg("Zero 'rho_p' or 'sin(theta_p)' occurred"); }
+
+  //// If out-of-range, the velocity is returned as zero
+  out_of_range = rho_p_min > rho_p or rho_p >= rho_p_max; 
+  if (out_of_range) { 
+    for (int i_p_dim = 0; i_p_dim < DIM_R; i_p_dim++) 
+    { v_p_vec[i_p_dim] = 0.0; }
+    return EXIT_SUCCESS;
+  }
+  
+  //// Define useful variables
+  const double cos_theta_p = cos(theta_p);
+
+  //// Aliasing
+  const std::complex<double> **psi_arr_arr = psi_in_sph_harm_basis_arr;
+
+
+  const bool eval_jac = (jac != NULL);
+  const int N_order_max = 3;
+  int N_order;
+  if (eval_jac) { N_order = N_order_max; }
+  else { N_order = 2; }
+  int deriv_order_arr[N_order];
+//  std::complex<double> psi_deriv_p_arr[N_order];
+  deriv_order_arr[0] = 0, deriv_order_arr[1] = 1;
+  if (eval_jac) { deriv_order_arr[2] = 2; }
+
+
+
+  //// Allocate memory
+//  std::complex<double> *psi_p_lm_arr, *dpsi_p_lm_arr, *d2psi_p_lm_arr;
+  std::complex<double> *Ylm_arr, *Yl1m_arr;
+  std::complex<double> **psi_deriv_p_lm_arr;
+  std::complex<double> *psi_deriv_p_lm_arr_1d;
+  std::complex<double> **psi_deriv_p_lm_arr_p, **psi_deriv_p_lm_arr_p_max;
+  std::complex<double> *psi_deriv_p_lm_arr_1d_p;
+  psi_deriv_p_lm_arr = new std::complex<double>*[N_lm];
+  psi_deriv_p_lm_arr_1d = new std::complex<double>[N_lm*N_order_max];
+
+  for(psi_deriv_p_lm_arr_p = psi_deriv_p_lm_arr, 
+      psi_deriv_p_lm_arr_p_max = psi_deriv_p_lm_arr + N_lm,
+      psi_deriv_p_lm_arr_1d_p = psi_deriv_p_lm_arr_1d;
+      psi_deriv_p_lm_arr_p < psi_deriv_p_lm_arr_p_max; 
+      psi_deriv_p_lm_arr_p++, psi_deriv_p_lm_arr_1d_p += N_order_max) 
+  { *psi_deriv_p_lm_arr_p = psi_deriv_p_lm_arr_1d_p; }
+
+
+//  psi_p_lm_arr = new std::complex<double>[N_lm];
+//  dpsi_p_lm_arr = new std::complex<double>[N_lm];
+//  if (eval_jac) { d2psi_p_lm_arr = new std::complex<double>[N_lm]; }
+  Ylm_arr = new std::complex<double>[N_lm];
+  Yl1m_arr = new std::complex<double>[N_lm];
+
 
   //// Variables to be used in loop
   int i_lm;
-  const std::complex<double> *psi_arr, **psi_arr_p;
+//  const std::complex<double> *psi_arr;
+  const std::complex<double> **psi_arr_p;
   int *l_p, *m_p;
   std::complex<double> exp_phi, Ylm, Yl1m, psi_p, dpsi_p;
   double l, m, m_power_of_minus_1;
   int li, mi, m_sign, m_abs;
-  bool out_of_range;
+
 
 
   for (
@@ -395,34 +450,31 @@ int eval_v_p_for_sph_harm_basis(
   {
 
     li = *l_p, mi = *m_p;
-    l = (double) li;
-    m = (double) mi;
+    l = (double) li; m = (double) mi;
     m_sign = 1 - 2 * (1 - (mi>=0));
-    m_power_of_minus_1 = 1.0 - 2.0 * (mi%2);
     m_abs = m_sign * mi;
-    psi_arr = *psi_arr_p;
+    m_power_of_minus_1 = 1.0 - 2.0 * (mi%2);
 
-  
+//    psi_arr = *psi_arr_p;
+//    printf("before eval_psi_deriv_p()\n");
+
     //// Estimate `psi_p` and `dpsidrho_p` using finite difference
-    return_code = eval_psi_and_dpsidx_p< std::complex<double> >(
-        rho_p, psi_arr, rho_arr,
-        N_s, N_rho, rho_p_lim,
-        &psi_p, &dpsi_p);
+    return_code = eval_psi_deriv_p< std::complex<double> >(
+        rho_p, *psi_arr_p, rho_arr, N_s, N_rho, rho_p_lim, N_order,
+        deriv_order_arr, psi_deriv_p_lm_arr[i_lm]);
+//    return_code = eval_psi_deriv_p< std::complex<double> >(
+//        rho_p, psi_arr, rho_arr, N_s, N_rho, rho_p_lim, N_order,
+//        deriv_order_arr, psi_deriv_p_arr);
+//    return_code = eval_psi_and_dpsidx_p< std::complex<double> >(
+//        rho_p, psi_arr, rho_arr,
+//        N_s, N_rho, rho_p_lim,
+//        &psi_p, &dpsi_p);
     if (return_code != EXIT_SUCCESS)
     { return debug_mesg("Failed to 'eval_psi_and_dpsidx_p()'"); }
 
+    
+//    psi_p = psi_deriv_p_arr[0], dpsi_p = psi_deriv_p_arr[1];
 
-    //// If out-of-range, the velocity is returned as zero
-    out_of_range = rho_p_min > rho_p or rho_p >= rho_p_max; 
-    if (out_of_range) { 
-      for (int i_p_dim = 0; i_p_dim < DIM_R; i_p_dim++) 
-      { v_p_vec[i_p_dim] = 0.0; }
-      return EXIT_SUCCESS;
-    }
-
-    //// Check singularity
-    if (rho_p == 0 or sin(theta_p) == 0) 
-    { return debug_mesg("Zero 'rho_p' or 'sin(theta_p)' occurred"); }
 
     //// Evaluate ingredients
     exp_phi = std::complex<double>(cos(m_abs*phi_p), sin(m_abs*phi_p));
@@ -432,18 +484,45 @@ int eval_v_p_for_sph_harm_basis(
       Ylm = m_power_of_minus_1 * std::conj(Ylm);
       Yl1m = m_power_of_minus_1 * std::conj(Yl1m);
     }
-    
+
+    Ylm_arr[i_lm] = Ylm;
+    Yl1m_arr[i_lm] = Yl1m;
+
+  } // end for loop : `i_lm`
+  
+
+  for (
+      i_lm = 0, l_p=l_arr, m_p=m_arr;
+      i_lm < N_lm;
+      i_lm++, l_p++, m_p++
+      ) 
+  {
+    l = (double) *l_p; m = (double) *m_p;
+    Ylm = Ylm_arr[i_lm]; Yl1m = Yl1m_arr[i_lm];
+    psi_p = psi_deriv_p_lm_arr[i_lm][0];
+    dpsi_p = psi_deriv_p_lm_arr[i_lm][1];
+
     //// Add to target summations
     denum_p += psi_p * Ylm;
     numer_rho_p += dpsi_p * Ylm;
     numer_theta_p
-      += -cos(theta_p) * (l+1.0) * psi_p * Ylm
+      += - cos_theta_p * (l+1.0) * psi_p * Ylm
       + sqrt( (2.0*l+1.0)/(2.0*l+3.0) * (l+1.0+m) * (l+1.0-m) )
         * psi_p * Yl1m;
     numer_phi_p += m * psi_p * Ylm;
     
   } // i_lm
 
+
+
+  //// Deallocate arrays after use
+  delete [] psi_deriv_p_lm_arr_1d;
+  delete [] psi_deriv_p_lm_arr;
+//  delete [] psi_p_lm_arr;
+//  delete [] dpsi_p_lm_arr;
+//  if (eval_jac) { delete [] d2psi_p_lm_arr; }
+  delete [] Ylm_arr;
+  delete [] Yl1m_arr;
 
 
 #ifdef DEBUG

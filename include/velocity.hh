@@ -43,7 +43,7 @@ int eval_v_p_for_sph_harm_basis(
     const double r_p_vec[DIM_R], 
     const std::complex<double> **psi_in_sph_harm_basis_arr,
     const double *rho_arr, int *l_arr, int *m_arr, const double *rho_p_lim, 
-    double v_p_vec[DIM_R]);
+    double v_p_vec[DIM_R], double jac[DIM_R][DIM_R]=NULL);
 
 
 int eval_v_p_arr_for_sph_harm_basis(
