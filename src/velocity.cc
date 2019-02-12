@@ -500,17 +500,13 @@ int eval_v_p_for_sph_harm_basis(
     //// Add to target summations
     psi_p_Y += psi_p * Ylm;
     dpsi_p_Y += dpsi_p * Ylm;
-
     psi_p_dtheta_Y += psi_p * dtheta_Ylm;
-//      += - cos_theta_p * (l+1.0) * psi_p * Ylm
-//      + sqrt( (2.0*l+1.0)/(2.0*l+3.0) * (l+1.0+m) * (l+1.0-m) )
-//        * psi_p * Yl1m;
-//    psi_p_dtheta_Y /= sin_theta_p;
-
     psi_p_dphi_Y += m * psi_p * Ylm;
     
   } // i_lm
-  
+ 
+  const std::complex<double> imag_unit = std::complex<double>(0.0, 1.0);
+  psi_p_dphi_Y *= imag_unit;
 
 
   std::complex<double> d2theta_Y;
@@ -540,12 +536,15 @@ int eval_v_p_for_sph_harm_basis(
       dpsi_p_dphi_Y += dpsi_p * m * Ylm;
       psi_p_d2theta_Y += psi_p * d2theta_Y;
       psi_p_dphi_dtheta_Y += psi_p * m * dtheta_Ylm;
-//      psi_p_dtheta_dphi_Y += psi_p * m * dtheta_Ylm;
       psi_p_d2phi_Y += psi_p * m * m * Ylm;
   
     } // i_lm
 
   } // end if : `eval_jac`
+
+  dpsi_p_dphi_Y *= imag_unit;
+  psi_p_dphi_dtheta_Y *= imag_unit;
+  psi_p_d2phi_Y *= imag_unit * imag_unit;
 
 
 
@@ -650,7 +649,7 @@ int eval_v_p_for_sph_harm_basis(
     / (rho_p);
 
   v_p_vec[2] 
-    = (psi_p_dphi_Y / psi_p_Y).real()
+    = (psi_p_dphi_Y / psi_p_Y).imag()
     / (rho_p * sin_theta_p);
 
 
@@ -663,16 +662,19 @@ int eval_v_p_for_sph_harm_basis(
   //// Evaluate Jacobian
   const std::complex<double> psi_p_Y_sq = psi_p_Y * psi_p_Y;
   if (eval_jac) {
+
     jac[0][0] = ( d2psi_p_Y / psi_p_Y - (dpsi_p_Y*dpsi_p_Y)/(psi_p_Y_sq) ).imag();
     jac[0][1] = ( dpsi_p_dtheta_Y / psi_p_Y - dpsi_p_Y*psi_p_dtheta_Y/(psi_p_Y_sq) ).imag();
     jac[0][2] = ( dpsi_p_dphi_Y / psi_p_Y - dpsi_p_Y * psi_p_dphi_Y / (psi_p_Y_sq) ).imag();
-//    jac[1][0] = (-v_p_vec[0] + dpsi_p_dtheta_Y/psi_p_Y - (psi_p_dtheta_Y*dpsi_p_Y)/psi_p_Y_sq).imag() / rho_p;
+
     jac[1][0] = (-v_p_vec[1] + jac[0][1]) / rho_p;
     jac[1][1] = ( psi_p_d2theta_Y / psi_p_Y - psi_p_dtheta_Y*psi_p_dtheta_Y/psi_p_Y_sq ).imag() / rho_p;
     jac[1][2] = ( psi_p_dphi_dtheta_Y / psi_p_Y - psi_p_dtheta_Y*psi_p_dphi_Y / psi_p_Y_sq ).imag() / rho_p;
+
     jac[2][0] = - 1.0 / rho_p * (v_p_vec[2] + 1.0 / sin_theta_p * jac[0][2]);
     jac[2][1] = - cot_theta_p * v_p_vec[2] + 1.0 / sin_theta_p * jac[1][2];
     jac[2][2] = ( psi_p_d2phi_Y / psi_p_Y - psi_p_dphi_Y*psi_p_dphi_Y / psi_p_Y_sq ).imag() / (rho_p * sin_theta_p);
+
   }
 
   //// Return from thie program
@@ -712,41 +714,26 @@ int eval_v_p_vec_arr_for_sph_harm_basis(
   //
   // [OUTPUT]
   // `v_p_vec_arr` : 2D array of shape (`N_p`,`DIM_R`)
+  // `jac_p_arr` : 1D array of `jac_t` type of shape (`N_p`,)
+  //             : It is effectivly a 3D array of shape (`N_p`,`DIM_R`,`DIM_R`)
   //
 
   int return_code = EXIT_FAILURE;
 
-//  if (jac_p_arr == NULL) {
-//    jac_p_arr = new jac_t[N_p];
-//    for (int i_p = 0; i_p < N_p; i_p++) {
-//      jac_p_arr[i_p] = NULL;
-//    }
-//  }
-//
-//  jac_t jac_p;
-//  double r_p_vec[DIM_R], v_p_vec[DIM_R];
-
   for (int i_p = 0; i_p < N_p; i_p++) {
 
-//    for (int i_dim = 0; i_dim < DIM_R; i_dim++)
-//    { r_p_vec[i_dim] = r_p_arr[i_dim][i_p]; }
-    if (jac_p_arr == NULL) { // { jac_p = jac_p_arr[i_p]; }
+    if (jac_p_arr == NULL) { 
       return_code = eval_v_p_for_sph_harm_basis(
           N_s, N_rho, N_lm, r_p_vec_arr[i_p], psi_in_sph_harm_basis_arr,
           rho_arr, l_arr, m_arr, rho_p_lim, v_p_vec_arr[i_p]);
-
     } else {
       return_code = eval_v_p_for_sph_harm_basis(
           N_s, N_rho, N_lm, r_p_vec_arr[i_p], psi_in_sph_harm_basis_arr,
           rho_arr, l_arr, m_arr, rho_p_lim, v_p_vec_arr[i_p], jac_p_arr[i_p]);
-    
     }
 
     if (return_code != EXIT_SUCCESS) 
     { return debug_mesg("Failed during 'eval_v_p_for_sph_harm_basis()'"); }
-
-//    for (int i_dim = 0; i_dim < DIM_R; i_dim++)
-//    { v_p_arr[i_dim][i_p] = v_p_vec[i_dim]; }
 
   } // for-loop : i_p
 
@@ -763,7 +750,7 @@ int eval_v_p_arr_for_sph_harm_basis(
     const int N_s, const int N_p, const int N_rho, const int N_lm,
     double **r_p_arr, const std::complex<double> **psi_in_sph_harm_basis_arr,
     double *rho_arr, int *l_arr, int *m_arr, const double *rho_p_lim, 
-    double **v_p_arr)
+    double **v_p_arr, jac_t *jac_p_arr)
 {
 
   //// Function Argument
@@ -787,6 +774,8 @@ int eval_v_p_arr_for_sph_harm_basis(
   //
   // [OUTPUT]
   // `v_p_arr` : 2D array of shape (`DIM_R`,`N_p`)
+  // `jac_p_arr` : 1D array of `jac_t` type of shape (`N_p`,)
+  //             : It is effectivly a 3D array of shape (`N_p`,`DIM_R`,`DIM_R`)
   //
 
   int return_code = EXIT_FAILURE;
@@ -798,9 +787,15 @@ int eval_v_p_arr_for_sph_harm_basis(
     for (int i_dim = 0; i_dim < DIM_R; i_dim++)
     { r_p_vec[i_dim] = r_p_arr[i_dim][i_p]; }
 
-    return_code = eval_v_p_for_sph_harm_basis(
-        N_s, N_rho, N_lm, r_p_vec, psi_in_sph_harm_basis_arr,
-        rho_arr, l_arr, m_arr, rho_p_lim, v_p_vec);
+    if (jac_p_arr == NULL) { 
+      return_code = eval_v_p_for_sph_harm_basis(
+          N_s, N_rho, N_lm, r_p_vec, psi_in_sph_harm_basis_arr,
+          rho_arr, l_arr, m_arr, rho_p_lim, v_p_vec);
+    } else {
+      return_code = eval_v_p_for_sph_harm_basis(
+          N_s, N_rho, N_lm, r_p_vec, psi_in_sph_harm_basis_arr,
+          rho_arr, l_arr, m_arr, rho_p_lim, v_p_vec, jac_p_arr[i_p]);
+    }
     if (return_code != EXIT_SUCCESS) 
     { return debug_mesg("Failed during 'eval_v_p_for_sph_harm_basis()'"); }
 
