@@ -155,29 +155,24 @@ int eval_psi_deriv_p(
     delta_x_s = x_arr[*i_x_s_arr_p] - x_p;
     for (int i_row = 1; i_row < N_s; ++i_row) {
       power_matrix[i_s][i_row] = power_matrix[i_s][i_row-1] * delta_x_s;
-    }
+    } // end for loop : `i_row`
 
   } // for-loop `i_s`
 
   for (int i_order = 0; i_order < b_vec_matrix_col_num; i_order++) {
     deriv_order = deriv_order_arr[i_order];
     b_vec_matrix[i_order][deriv_order] = 1.0; 
-  }
-//  b_vec_matrix[0][0] = 1.0; // for psi
-//  b_vec_matrix[1][1] = 1.0; // for dpsidx
+  } // end for loop : `i_order`
 
  
 #ifdef DEBUG
   printf("x_p = %7.3f\n",x_p);
   for (int i_row = 0; i_row < N_s; i_row++) {
     printf("%7.3f",x_arr[i_x_s_arr[i_row]]);
-    for (int i_col = 0; i_col < N_s; i_col++) {
-      printf("%7.3f", power_matrix[i_col][i_row]); 
-    }
-    for (int i_o = 0; i_o < N_o; i_o++) {
-      printf("%7.3f", b_vec_matrix[i_o][i_row]);
-    }
-//    printf("%7.3f%7.3f", b_vec_matrix[0][i_row], b_vec_matrix[1][i_row]);
+    for (int i_col = 0; i_col < N_s; i_col++)
+    { printf("%7.3f", power_matrix[i_col][i_row]); }
+    for (int i_o = 0; i_o < N_o; i_o++) 
+    { printf("%7.3f", b_vec_matrix[i_o][i_row]); }
     printf("\n");
   }
 
@@ -192,52 +187,20 @@ int eval_psi_deriv_p(
 
 #endif // DEBUG
 
-
   //// Solve linear system for obtaining finite-difference coefficients
   dgesv_(
       &N_s, &b_vec_matrix_col_num, power_matrix_1d, &N_s, 
       pivot_indices, b_vec_matrix_1d, &N_s, &gesv_info
   );
-  if ( handle_gesv_info(gesv_info) != EXIT_SUCCESS) 
+  if ( handle_gesv_info(gesv_info) != EXIT_SUCCESS)
   { return return_with_mesg("Failed solving for coeffcients"); }
-
-
-#ifdef DEBUG
-
-//  printf("power_matrix_1d: ");
-//  for (int i=0; i < N_s*N_s; i++) {
-//    printf("%7.3f", power_matrix_1d[i]);
-//  } printf("\n");
-//  printf("coef_vec_matrix: ");
-//  for (int i=0; i < N_s*b_vec_matrix_col_num; i++) {
-//    printf("%7.3f", coef_vec_matrix[0][i]);
-//  } printf("\n");
-
-#endif // DEBUG
-  
 
   //// Evaluate the finite-difference-approximated values: psi, dpsidx
   for (int i_o = 0; i_o < N_o; i_o++) {
     psi_deriv_p_arr[i_o] = 0.0;
-//    *psi_p_arr_p = 0, *dpsidx_p_arr_p = 0;
     for (int i_s = 0; i_s < N_s; i_s++) {
       psi_x_s = psi_arr[i_x_s_arr[i_s]];
       psi_deriv_p_arr[i_o] += coef_vec_matrix[i_o][i_s] * psi_x_s;
-//      *dpsidx_p_arr_p += coef_vec_matrix[1][i_s] * psi_x_s;
-
-#ifdef DEBUG
-//    printf(
-//        "psi_x_s: %7.3f,"
-//        " coef_vec_matrix[0][i_s]: %7.3f,"
-//        " coef_vec_matrix[1][i_s]: %7.3f,"
-//        " *psi_p_arr_p: %7.3f, *dpsidx_p_arr_p: %7.3f\n",
-//        std::real(psi_x_s), 
-//        coef_vec_matrix[0][i_s], 
-//        coef_vec_matrix[1][i_s], 
-//        std::real(*psi_p_arr_p), std::real(*dpsidx_p_arr_p)
-//    );
-#endif // DEBUG
-
     } // end for loop : i_o
   } // end for loop : i_s
 
@@ -424,14 +387,6 @@ int eval_v_p_for_sph_harm_basis(
   bool out_of_range;
 
 
-#ifdef DEBUG
-  printf("rho_p_arr: \n");
-  for (int i_p = 0; i_p < N_p; i_p++) {
-    printf("%7.3f",r_p_arr[0][i_p]);
-  } printf("\n");
-#endif // DEBUG
-
-
   for (
       i_lm = 0, psi_arr_p = psi_arr_arr, l_p=l_arr, m_p=m_arr;
       i_lm < N_lm;
@@ -455,16 +410,6 @@ int eval_v_p_for_sph_harm_basis(
         &psi_p, &dpsi_p);
     if (return_code != EXIT_SUCCESS)
     { return debug_mesg("Failed to 'eval_psi_and_dpsidx_p()'"); }
-
-
-#ifdef DEBUG
-    printf("psi_arr: \n");
-    for (int i_p = 0; i_p < N_p; i_p++) {
-      printf(
-          "%7.3f%7.3f\n", 
-          psi_p_arr[i_p].real(), dpsidrho_p_arr[i_p].real());
-    } printf("\n");
-#endif // DEBUG
 
 
     //// If out-of-range, the velocity is returned as zero
@@ -509,11 +454,10 @@ int eval_v_p_for_sph_harm_basis(
       "%15s%15s%15s%15s\n", 
       "denum","numer_p_rho","numer_p_theta","numer_p_phi");
 
-  for (int i_p = 0; i_p < N_p; i_p++) {
-    printf("%15.7f%15.7f%15.7f%15.7f\n",
-        std::real(denum_p_arr[i_p]), std::real(numer_p_rho_arr[i_p]),
-        std::real(numer_p_theta_arr[i_p]), std::real(numer_p_phi_arr[i_p]));
-  } printf("\n");
+  printf("%15.7f%15.7f%15.7f%15.7f\n",
+      std::real(denum_p), std::real(numer_rho_p),
+      std::real(numer_theta_p), std::real(numer_phi_p));
+  printf("\n");
 
 
   //// Print imaginary part
@@ -522,11 +466,10 @@ int eval_v_p_for_sph_harm_basis(
       "%15s%15s%15s%15s\n", 
       "denum","numer_p_rho","numer_p_theta","numer_p_phi");
 
-  for (int i_p = 0; i_p < N_p; i_p++) {
-    printf("%15.7f%15.7f%15.7f%15.7f\n",
-        std::imag(denum_p_arr[i_p]), std::imag(numer_p_rho_arr[i_p]),
-        std::imag(numer_p_theta_arr[i_p]), std::imag(numer_p_phi_arr[i_p]));
-  } printf("\n");
+  printf("%15.7f%15.7f%15.7f%15.7f\n",
+      std::imag(denum_p), std::imag(numer_rho_p),
+      std::imag(numer_theta_p), std::imag(numer_phi_p));
+  printf("\n");
 
 #endif // DEBUG
 
@@ -601,9 +544,8 @@ int eval_v_p_for_sph_harm_basis(
 
 
 #ifdef DEBUG
-  printf("%5d%15.5f%15.5f%15.5f\n", 
-      i_p, 
-      v_p_arr[0][i_p], v_p_arr[1][i_p], v_p_arr[2][i_p]);
+  printf("%15.5f%15.5f%15.5f\n", 
+      v_p_vec[0], v_p_vec[1], v_p_vec[2]);
 #endif // DEBUG
 
 
