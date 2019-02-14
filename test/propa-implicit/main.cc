@@ -29,11 +29,11 @@ int main(int argc, char *argv[]) {
 
   int N_lm;
   if ( eval_N_lm(qprop_dim, N_l, &N_lm) != EXIT_SUCCESS) 
-  { return return_with_mesg("Failed to evaluate 'N_lm'"); }
+  { return debug_mesg("Failed to evaluate 'N_lm'"); }
 
   int l_arr[N_lm], m_arr[N_lm];
   if ( eval_l_m_arr(qprop_dim, N_l, l_arr, m_arr, initial_m) != EXIT_SUCCESS )
-  { return return_with_mesg("Failed to evaluate 'l_arr', 'm_arr'"); }
+  { return debug_mesg("Failed to evaluate 'l_arr', 'm_arr'"); }
 
 
   //// Define useful variables
@@ -159,15 +159,16 @@ int main(int argc, char *argv[]) {
 
   for (int i_t = 1; i_t < N_t; i_t++) {
 
+    _delta_t = t_arr[i_t] - t_arr[i_t-1];
+
+    return_code = propa_psi_arr(
+        psi_arr, _delta_t, N_rho,N_lm,qprop_dim,initial_m);
+    if (return_code != EXIT_SUCCESS) 
+    { return debug_mesg("Failed during propagation of 'psi_arr'"); }
+      
+
     for (int i_p = 0; i_p < N_p; i_p++) {
 
-      _delta_t = t_arr[i_t] - t_arr[i_t-1];
-
-      return_code = propa_psi_arr(
-          psi_arr, _delta_t, N_rho,N_lm,qprop_dim,initial_m);
-      if (return_code != EXIT_SUCCESS) 
-      { return debug_mesg("Failed during propagation of 'psi_arr'"); }
-      
       for (int i_dim = 0; i_dim < DIM_R; i_dim++)
       { r_p_t_vec[i_dim] = r_p_arr[i_dim][i_p]; }
 
