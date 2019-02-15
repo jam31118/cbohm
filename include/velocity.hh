@@ -39,6 +39,17 @@ int eval_psi_and_dpsidx_arr(
     const int N_s, const int N_p, const int N_x, const double *x_p_lim, 
     T *psi_p_arr, T *dpsidx_p_arr);
 
+int eval_psi_and_di_psi_and_dj_di_psi_for_sph_harm_basis(
+    const int N_s, const int N_rho, const int N_lm, 
+    const double r_p_vec[DIM_R], 
+    const std::complex<double> **psi_in_sph_harm_basis_arr,
+    const double *rho_arr, const int *l_arr, const int *m_arr, 
+    const double *rho_p_lim, 
+    z_t *psi_p_p, z_t di_psi[DIM_R], z_t dj_di_psi[DIM_R][DIM_R]=NULL);
+
+int eval_jac_v_3D(
+    const jac_t dj_hi, const vec_t hi, const z_t dj_di_psi[DIM_R][DIM_R],
+    const z_t di_psi[DIM_R], const z_t psi, jac_t dj_vi);
 
 int eval_v_p_for_sph_harm_basis(
     const int N_s, const int N_rho, const int N_lm, 
