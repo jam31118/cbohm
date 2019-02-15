@@ -8,8 +8,12 @@ int prop_implicit_euler_in_sph_harm_basis(
     const std::complex<double> **psi_t_next_arr_arr,
     const double *rho_arr, const int *l_arr, const int *m_arr,
     const double *rho_p_lim, double delta_t, double thres, 
-    double r_p_t_vec[DIM_R]) 
+    double r_p_t_vec[DIM_R], bool verbose)
 {
+
+
+//  printf("[ LOG @ %s:%d:%s() ] r_p_t_vec %7.3f%7.3f%7.3f: \n", __FILE__,__LINE__,__func__, r_p_t_vec[0], r_p_t_vec[1], r_p_t_vec[2]);
+//  printf("%7.3f%7.3f%7.3f\n", r_p_t_vec[0], r_p_t_vec[1], r_p_t_vec[2]);
 
   //// Function Argument(s)
   // 
@@ -63,10 +67,16 @@ int prop_implicit_euler_in_sph_harm_basis(
   { r_p_vec[i_dim] = r_p_t_vec[i_dim]; }
 
 
+//  printf("%60s\n", "r_p_vec: ");
+
   //// Iteration starts here
   int i_iter;
   for (i_iter = 0; i_iter < NEWTON_ITER_MAX; i_iter++) {
 
+//    printf("[ LOG @ %s:%d ] right before eval_v_p_for_sph_harm_basis()\n", __FILE__,__LINE__);
+//    if (jac_v == NULL) {printf("[ LOG @ %s:%d ] jac_v is NULL\n", __FILE__,__LINE__);}
+//    else {printf("[ LOG @ %s:%d ] jac_v is not NULL\n", __FILE__,__LINE__);}
+    
     //// Evaluate velocity vector and Jacobian of vector
     eval_v_p_for_sph_harm_basis(
         N_s, N_rho, N_lm, r_p_vec, psi_t_next_arr_arr, rho_arr, 
@@ -77,7 +87,22 @@ int prop_implicit_euler_in_sph_harm_basis(
       negative_g[i_dim] = - (
           r_p_vec[i_dim] - r_p_t_vec[i_dim] - delta_t*v_p_vec[i_dim]);
     }
+
+if (verbose) {
+
+    printf("[ LOG ][i_iter=%05d] r_p_vec: \n", i_iter);
+    for (int i_dim = 0; i_dim < DIM_R; i_dim++) {
+      printf("%20.15f", r_p_vec[i_dim]);
+    } // end-for-loop : `i_dim`
+    printf("%20.15f\n", vec_norm(negative_g));
+//    printf("\n");
     
+//    printf("[ LOG ][i_iter=%05d] jac_v: \n", i_iter);
+//    print_jac_t(jac_v);
+
+}
+    
+
     //// Terminate iteration
     if (vec_norm(negative_g) < thres) { break; }
   
@@ -111,7 +136,15 @@ int prop_implicit_euler_in_sph_harm_basis(
 
   //// Check whether the number of iteration has been exceeded a given value
   if (i_iter >= NEWTON_ITER_MAX) 
-  { return debug_mesg("NEWTON_ITER_MAX exceeded"); }
+  { 
+    fprintf(stderr,
+        "[i_iter=%03d] r_p_vec: %20.15f%20.15f%20.15f / norm: %20.15f\n",
+        i_iter, r_p_vec[0],r_p_vec[1],r_p_vec[2],vec_norm(negative_g));
+    fprintf(stderr,
+        "[i_iter=%03d] v_p_vec: %20.15f%20.15f%20.15f / norm: %20.15f\n",
+        i_iter, v_p_vec[0],v_p_vec[1],v_p_vec[2],vec_norm(negative_g));
+    return debug_mesg("NEWTON_ITER_MAX exceeded"); 
+  }
 
   //// Return if everything is alright
   return EXIT_SUCCESS;
