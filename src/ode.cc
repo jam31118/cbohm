@@ -54,12 +54,14 @@ int prop_implicit_euler_in_sph_harm_basis(
   //// Declare variables
   int return_code = EXIT_FAILURE;
   
-  vec_t v_p_vec, negative_g, r_p_vec;
+  vec_t v_p_vec, negative_g, r_p_vec, r_p_vec_trial, v_p_vec_trial, negative_g_trial;
   double *delta_r_p_vec;
   jac_t jac_v, jac_g;
 
   const int n = DIM_R, nrhs = 1;
   int ipiv[n], gesv_info;
+  float attenuation = 1.0;
+  const float attenuation_ratio = 0.8;
 
 
   //// Initialize `r_p_vec`
@@ -85,22 +87,20 @@ int prop_implicit_euler_in_sph_harm_basis(
     //// Evaluate negative_g array (the right hand side of linear system eq.)
     for (int i_dim = 0; i_dim < DIM_R; i_dim++) {
       negative_g[i_dim] = - (
-          r_p_vec[i_dim] - r_p_t_vec[i_dim] - delta_t*v_p_vec[i_dim]);
+          r_p_vec[i_dim] - r_p_t_vec[i_dim] - delta_t * v_p_vec[i_dim]);
     }
 
-if (verbose) {
 
-    printf("[ LOG ][i_iter=%05d] r_p_vec: \n", i_iter);
-    for (int i_dim = 0; i_dim < DIM_R; i_dim++) {
-      printf("%20.15f", r_p_vec[i_dim]);
-    } // end-for-loop : `i_dim`
-    printf("%20.15f\n", vec_norm(negative_g));
-//    printf("\n");
-    
-//    printf("[ LOG ][i_iter=%05d] jac_v: \n", i_iter);
-//    print_jac_t(jac_v);
-
-}
+    if (verbose) {
+      printf("[ LOG ][i_iter=%05d] r_p_vec: \n", i_iter);
+      for (int i_dim = 0; i_dim < DIM_R; i_dim++) {
+        printf("%20.15f", r_p_vec[i_dim]);
+      } // end-for-loop : `i_dim`
+      printf("%20.15f\n", vec_norm(negative_g));
+//      printf("\n");
+//      printf("[ LOG ][i_iter=%05d] jac_v: \n", i_iter);
+//      print_jac_t(jac_v);
+    }
     
 
     //// Terminate iteration
@@ -109,7 +109,7 @@ if (verbose) {
     //// Evaluate Jacobian for function 'g'
     for (int i_row = 0; i_row < DIM_R; i_row++) {
       for (int i_col = 0; i_col < DIM_R; i_col++) {
-        jac_g[i_col][i_row] = (i_row==i_col) + delta_t * jac_v[i_row][i_col];
+        jac_g[i_col][i_row] = (i_row==i_col) + delta_t - jac_v[i_row][i_col];
       }
     }
   
@@ -121,12 +121,50 @@ if (verbose) {
   
     //// aliasing
     delta_r_p_vec = negative_g;
+
+
+    //// Determine step size and commit newton iteration
+    int i_trial;
+    for (i_trial = 0; i_trial < NEWTON_LINE_SEARCH_ITER_MAX; i_trial++) {
   
+      for (int i_dim = 0; i_dim < DIM_R; i_dim++) {
+        r_p_vec_trial[i_dim] = r_p_vec[i_dim] + attenuation * delta_r_p_vec[i_dim];
+      } // end-for-loop : `i_dim`
+
+
+      //// Test vec_norm
+      eval_v_p_for_sph_harm_basis(
+          N_s, N_rho, N_lm, r_p_vec_trial, psi_t_next_arr_arr, rho_arr, 
+          l_arr, m_arr, rho_p_lim, v_p_vec_trial, NULL);
+
+      for (int i_dim = 0; i_dim < DIM_R; i_dim++) {
+        negative_g_trial[i_dim] = - (
+            r_p_vec_trial[i_dim] - r_p_t_vec[i_dim] - delta_t*v_p_vec_trial[i_dim]);
+      }
+//      if (vec_norm(r_p_vec_trial) < vec_norm(r_p_vec)) { break; } 
+      if (vec_norm(negative_g_trial) < vec_norm(negative_g)) { break; } 
+      else { attenuation *= attenuation_ratio; }
+
+    }
+    if (i_trial >= NEWTON_LINE_SEARCH_ITER_MAX) 
+    { return debug_mesg("NEWTON_LINE_SEARCH_ITER_MAX exceeded"); }
+
+
+    //// Update `r_p_vec` (with determined attenuation)
     for (int i_dim = 0; i_dim < DIM_R; i_dim++) {
-      r_p_vec[i_dim] += delta_r_p_vec[i_dim];
+      r_p_vec[i_dim] = r_p_vec_trial[i_dim];
     } // end-for-loop : `i_dim`
 
+
   } // end-for-loop : `i_iter`
+
+
+
+//  for (int i_trial = 0; i_trial < NEWTON_LINE_SEARCH_ITER_MAX; i_trial++) {
+//    for (int i_dim = 0; i_dim < DIM_R; i_dim++) {
+//      r_p_vec_trial[i_dim] = attenuation * r_p_vec[i_dim
+//    } // end-for-loop : `i_dim`
+//  }
 
 
   for (int i_dim = 0; i_dim < DIM_R; i_dim++) {
