@@ -109,7 +109,7 @@ if (verbose) {
     //// Evaluate Jacobian for function 'g'
     for (int i_row = 0; i_row < DIM_R; i_row++) {
       for (int i_col = 0; i_col < DIM_R; i_col++) {
-        jac_g[i_col][i_row] = (i_row==i_col) + delta_t * jac_v[i_row][i_col];
+        jac_g[i_col][i_row] = (i_row==i_col) - delta_t * jac_v[i_row][i_col];
       }
     }
   
