@@ -125,6 +125,7 @@ int prop_implicit_euler_in_sph_harm_basis(
 
     //// Determine step size and commit newton iteration
     int i_trial;
+    attenuation = 1.0;
     for (i_trial = 0; i_trial < NEWTON_LINE_SEARCH_ITER_MAX; i_trial++) {
   
       for (int i_dim = 0; i_dim < DIM_R; i_dim++) {
@@ -143,7 +144,7 @@ int prop_implicit_euler_in_sph_harm_basis(
       }
 //      if (vec_norm(r_p_vec_trial) < vec_norm(r_p_vec)) { break; } 
       if (vec_norm(negative_g_trial) < vec_norm(negative_g)) { break; } 
-      else { attenuation *= attenuation_ratio; }
+      else { attenuation *= attenuation_ratio; fprintf(stdout,"[ LOG ] attentuation reduce to %.3f\n",attenuation); }
 
     }
     if (i_trial >= NEWTON_LINE_SEARCH_ITER_MAX) 

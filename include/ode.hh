@@ -7,7 +7,7 @@
 #include "velocity-def.hh"
 
 #define NEWTON_ITER_MAX 1000
-#define NEWTON_LINE_SEARCH_ITER_MAX 10
+#define NEWTON_LINE_SEARCH_ITER_MAX 100
 
 int prop_implicit_euler_in_sph_harm_basis(
     const int N_s, const int N_rho, const int N_lm,
