@@ -61,13 +61,22 @@ int prop_implicit_euler_in_sph_harm_basis(
   const int n = DIM_R, nrhs = 1;
   int ipiv[n], gesv_info;
 
+  double g_norm;
 
+
+//  printf("%60s\n", "r_p_vec: ");
+
+  float attenuation = 1.0;
+  const float atten_ratio = 0.8;
+
+  
+  while (attenuation > NEWTON_MIN_ATTEN_COEF) {
+
+    
   //// Initialize `r_p_vec`
   for (int i_dim=0; i_dim < DIM_R; i_dim++)
   { r_p_vec[i_dim] = r_p_t_vec[i_dim]; }
 
-
-//  printf("%60s\n", "r_p_vec: ");
 
   //// Iteration starts here
   int i_iter;
@@ -87,6 +96,7 @@ int prop_implicit_euler_in_sph_harm_basis(
       negative_g[i_dim] = - (
           r_p_vec[i_dim] - r_p_t_vec[i_dim] - delta_t*v_p_vec[i_dim]);
     }
+    g_norm = vec_norm(negative_g);
 
 if (verbose) {
 
@@ -94,7 +104,7 @@ if (verbose) {
     for (int i_dim = 0; i_dim < DIM_R; i_dim++) {
       printf("%20.15f", r_p_vec[i_dim]);
     } // end-for-loop : `i_dim`
-    printf("%20.15f\n", vec_norm(negative_g));
+    printf("%20.15f%20.15f%20.15f%20.15f\n", g_norm, -negative_g[0], -negative_g[1], -negative_g[2]);
 //    printf("\n");
     
 //    printf("[ LOG ][i_iter=%05d] jac_v: \n", i_iter);
@@ -102,9 +112,8 @@ if (verbose) {
 
 }
     
-
     //// Terminate iteration
-    if (vec_norm(negative_g) < thres) { break; }
+    if (g_norm < thres) { break; }
   
     //// Evaluate Jacobian for function 'g'
     for (int i_row = 0; i_row < DIM_R; i_row++) {
@@ -123,28 +132,43 @@ if (verbose) {
     delta_r_p_vec = negative_g;
   
     for (int i_dim = 0; i_dim < DIM_R; i_dim++) {
-      r_p_vec[i_dim] += delta_r_p_vec[i_dim];
+      r_p_vec[i_dim] += attenuation * delta_r_p_vec[i_dim];
     } // end-for-loop : `i_dim`
 
   } // end-for-loop : `i_iter`
 
-
-  for (int i_dim = 0; i_dim < DIM_R; i_dim++) {
-    r_p_t_vec[i_dim] = r_p_vec[i_dim];
-  } // end-for-loop : `i_dim`
 
 
   //// Check whether the number of iteration has been exceeded a given value
   if (i_iter >= NEWTON_ITER_MAX) 
   { 
     fprintf(stderr,
-        "[i_iter=%03d] r_p_vec: %20.15f%20.15f%20.15f / norm: %20.15f\n",
-        i_iter, r_p_vec[0],r_p_vec[1],r_p_vec[2],vec_norm(negative_g));
+        "[i_iter=%03d] r_p_vec: %20.15f%20.15f%20.15f / norm: %20.15f / g: %20.15f%20.15f%20.15f\n",
+        i_iter, r_p_vec[0],r_p_vec[1],r_p_vec[2],g_norm, -negative_g[0], -negative_g[1], -negative_g[2]);
     fprintf(stderr,
         "[i_iter=%03d] v_p_vec: %20.15f%20.15f%20.15f / norm: %20.15f\n",
-        i_iter, v_p_vec[0],v_p_vec[1],v_p_vec[2],vec_norm(negative_g));
-    return debug_mesg("NEWTON_ITER_MAX exceeded"); 
+        i_iter, v_p_vec[0],v_p_vec[1],v_p_vec[2],g_norm);
+//    return debug_mesg("NEWTON_ITER_MAX exceeded"); 
+    
+//    attenuation -= 0.1;
+    attenuation *= atten_ratio;
+    fprintf(stderr, "attenuation reduced to %.3f\n", attenuation);
+
+  } else {
+    break;
   }
+
+  } // while-loop : attenuation
+
+
+  if (attenuation <= NEWTON_MIN_ATTEN_COEF) {
+    return debug_mesg("attenuation minimum reached");
+  }
+
+  for (int i_dim = 0; i_dim < DIM_R; i_dim++) {
+    r_p_t_vec[i_dim] = r_p_vec[i_dim];
+  } // end-for-loop : `i_dim`
+
 
   //// Return if everything is alright
   return EXIT_SUCCESS;

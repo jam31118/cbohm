@@ -8,6 +8,8 @@
 
 #define NEWTON_ITER_MAX 1000
 
+#define NEWTON_MIN_ATTEN_COEF 0.001
+
 int prop_implicit_euler_in_sph_harm_basis(
     const int N_s, const int N_rho, const int N_lm,
     const std::complex<double> **psi_t_next_arr_arr,
