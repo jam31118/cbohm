@@ -118,26 +118,26 @@ int main(int argc, char *argv[]) {
   double rho;
   for (int i_rho = 0; i_rho < N_rho; i_rho++) {
     rho = rho_arr[i_rho];
-//    psi_arr[0][i_rho] = 0.0;
+    psi_arr[0][i_rho] = 0.0;
 //    psi_arr[0][i_rho] = rho * 2.0 * exp(-rho);  // s-orbital
-    psi_arr[0][i_rho] = rho * exp(-rho);
+//    psi_arr[0][i_rho] = rho * exp(-rho);
     psi_arr[1][i_rho] = 0.0;
-//    psi_arr[2][i_rho] = 0.0;
-    psi_arr[2][i_rho] = rho * (2.0 - rho) * exp(-rho/2.0);
-//    psi_arr[3][i_rho] = 
-//      rho * 1.0 / (2.0*sqrt(6)) * rho * exp(-rho/2.0); // p(m=1) orbital
-    psi_arr[3][i_rho] = 0.0;
+    psi_arr[2][i_rho] = 0.0;
+//    psi_arr[2][i_rho] = rho * (2.0 - rho) * exp(-rho/2.0);
+    psi_arr[3][i_rho] = 
+      rho * 1.0 / (2.0*sqrt(6)) * rho * exp(-rho/2.0); // p(m=1) orbital
+//    psi_arr[3][i_rho] = 0.0;
   }
 
   // Evaluate analytical results
-  double _psi, _dpsi, _rho;
+//  double _psi, _dpsi, _rho;
   for (int i_p = 0; i_p < N_p; i_p++) {
 //    _rho = r_p_
-    _psi = exp(-rho)
-    v_p_ana_arr[0][i_p] = ().imag();
+//    _psi = exp(-rho);
+    v_p_ana_arr[0][i_p] = 0.0;
     v_p_ana_arr[1][i_p] = 0.0;
-    v_p_ana_arr[2][i_p] = 0.0;
-//    v_p_ana_arr[2][i_p] = 1.0 / (r_p_arr[0][i_p] * sin(r_p_arr[1][i_p]));
+//    v_p_ana_arr[2][i_p] = 0.0;
+    v_p_ana_arr[2][i_p] = 1.0 / (r_p_arr[0][i_p] * sin(r_p_arr[1][i_p]));
   }
 
   // `v_p_arr`

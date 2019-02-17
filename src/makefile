@@ -31,7 +31,7 @@ hydrogen.o: hydrogen.cc
 	$(CXX) -fPIC -c $< -o $@ $(OPTIMIZE_FLAGS) $(DEBUG_FLAGS) $(QPROP_INC_FLAGS)
 
 ode.o: ode.cc
-	$(CXX) -fPIC -c $< -o $@ $(OPTIMIZE_FLAGS) $(DEBUG_FLAGS)
+	$(CXX) -fPIC -c $< -o $@ $(OPTIMIZE_FLAGS) $(DEBUG_FLAGS) $(GSL_INC_FLAGS)
 
 clean:
 	$(RM) -f *.a *.o *.so $(LIB_DIR)/*.so $(LIB_DIR)/*.a
