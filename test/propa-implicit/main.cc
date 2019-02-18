@@ -118,8 +118,8 @@ int main(int argc, char *argv[]) {
   double rho;
   for (int i_rho = 0; i_rho < N_rho; i_rho++) {
     rho = rho_arr[i_rho];
-    psi_arr[0][i_rho] = 0.0;
-//    psi_arr[0][i_rho] = rho * 2.0 * exp(-rho);  // s-orbital
+//    psi_arr[0][i_rho] = 0.0;
+    psi_arr[0][i_rho] = rho * 2.0 * exp(-rho);  // s-orbital
 //    psi_arr[0][i_rho] = rho * exp(-rho);
     psi_arr[1][i_rho] = 0.0;
     psi_arr[2][i_rho] = 0.0;
@@ -180,7 +180,7 @@ int main(int argc, char *argv[]) {
 
       return_code = prop_implicit_euler_in_sph_harm_basis(
           N_s, N_rho, N_lm, (const std::complex<double> **) psi_arr, 
-          rho_arr, l_arr, m_arr, rho_p_lim, _delta_t, thres, r_p_t_vec);
+          rho_arr, l_arr, m_arr, rho_p_lim, _delta_t, thres, r_p_t_vec, r_p_t_vec);
       if (return_code != EXIT_SUCCESS) 
       { return debug_mesg("Failed during implicit Euler routine"); }
 
@@ -188,6 +188,17 @@ int main(int argc, char *argv[]) {
       { r_p_arr[i_dim][i_p] = r_p_t_vec[i_dim]; }
 
     } // end-for-loop : `i_p`
+
+  return_code = eval_v_p_arr_for_sph_harm_basis(
+      N_s, N_p, N_rho, N_lm,
+      r_p_arr, (const m_t **) psi_arr, 
+      rho_arr, l_arr, m_arr, rho_p_lim, 
+      v_p_arr);
+
+  if (return_code != EXIT_SUCCESS) {
+    fprintf(stderr, "[ERROR] Failed to run 'eval_psi_and_dpsidx_arr()'");
+    return return_code;
+  }
     
     //// Store `r_p_arr` and `v_p_arr`
     std::copy(
