@@ -27,7 +27,7 @@ void print_bar() {
 void print_3vec_p_arr(double *vec_p_arr, const int N_p, const int N_r_dim) {
   for (int i_p = 0; i_p < N_p; i_p++) {
     for (int i_r_dim = 0; i_r_dim < N_r_dim; i_r_dim++) {
-      printf("%15.5f",vec_p_arr[i_r_dim*N_p+i_p]);
+      printf("%15.10f",vec_p_arr[i_r_dim*N_p+i_p]);
     } printf("\n");
   }
 }
@@ -37,7 +37,7 @@ void print_jac_t(jac_t jac) {
 
     for (int i_row = 0; i_row < DIM_R; i_row++) {
       for (int i_col = 0; i_col < DIM_R; i_col++)
-      { printf("%15.5f", jac[i_row][i_col]); }
+      { printf("%15.10f", jac[i_row][i_col]); }
       printf("\n");
     } 
   
