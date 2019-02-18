@@ -47,8 +47,81 @@ int implicit_euler_fzero_func(
 
 }
 
+int implicit_euler_fzero_dfunc(
+    const gsl_vector *r_p_gsl_vec, void *g_param_p, gsl_matrix *jac_g)
+{
+  //// Process function arguments 
+  struct g_param *p = (struct g_param *) g_param_p;
+  vec_t r_p_vec;
+  for (int i=0; i<DIM_R; i++) 
+  { r_p_vec[i] = gsl_vector_get(r_p_gsl_vec, i); }
 
-void print_state(size_t i_iter, gsl_multiroot_fsolver *s) {                     
+  //// Evaluate v_p_vec
+  int return_code; vec_t v_p_vec; jac_t jac_v;
+  return_code = eval_v_p_for_sph_harm_basis(
+      p->N_s, p->N_rho, p->N_lm, r_p_vec, p->psi_t_next_arr_arr, p->rho_arr, 
+      p->l_arr, p->m_arr, p->rho_p_lim, v_p_vec, jac_v);
+  if (return_code != EXIT_SUCCESS) 
+  { return debug_mesg("Failed to eval_v_p_for_sph_harm_basis()"); } 
+
+  //// Evaluate Jacobian for function 'g'
+  double jac_g_ij;
+  for (int i_row = 0; i_row < DIM_R; i_row++) {
+    for (int i_col = 0; i_col < DIM_R; i_col++) {
+      jac_g_ij = (i_row==i_col) - p->delta_t * jac_v[i_row][i_col];
+      gsl_matrix_set(jac_g, i_row, i_col, jac_g_ij);
+    }
+  }
+
+  //// Return if everything goes well
+  return GSL_SUCCESS;
+
+}
+
+
+int implicit_euler_fzero_fdfunc(
+    const gsl_vector *r_p_gsl_vec, void *g_param_p, 
+    gsl_vector *g, gsl_matrix *jac_g)
+{
+  //// Process function arguments 
+  struct g_param *p = (struct g_param *) g_param_p;
+  vec_t r_p_vec;
+  for (int i=0; i<DIM_R; i++) 
+  { r_p_vec[i] = gsl_vector_get(r_p_gsl_vec, i); }
+
+  //// Evaluate v_p_vec
+  int return_code; vec_t v_p_vec; jac_t jac_v;
+  return_code = eval_v_p_for_sph_harm_basis(
+      p->N_s, p->N_rho, p->N_lm, r_p_vec, p->psi_t_next_arr_arr, p->rho_arr, 
+      p->l_arr, p->m_arr, p->rho_p_lim, v_p_vec, jac_v);
+  if (return_code != EXIT_SUCCESS) 
+  { return debug_mesg("Failed to eval_v_p_for_sph_harm_basis()"); } 
+
+  //// Evaluate target function value(s)
+  double g_i;
+  for (int i=0; i<DIM_R; i++) {
+    g_i = r_p_vec[i] - p->r_p_t_vec[i] - p->delta_t*v_p_vec[i];
+    gsl_vector_set(g, i, g_i);
+  }
+
+  //// Evaluate Jacobian for function 'g'
+  double jac_g_ij;
+  for (int i_row = 0; i_row < DIM_R; i_row++) {
+    for (int i_col = 0; i_col < DIM_R; i_col++) {
+      jac_g_ij = (i_row==i_col) - p->delta_t * jac_v[i_row][i_col];
+      gsl_matrix_set(jac_g, i_row, i_col, jac_g_ij);
+    }
+  }
+  
+
+  //// Return if everything goes well
+  return GSL_SUCCESS;
+
+}
+
+
+void print_state(size_t i_iter, gsl_multiroot_fdfsolver *s) {         
+//void print_state(size_t i_iter, gsl_multiroot_fsolver *s) {                     
   printf("[ i_iter = %03lu ] x = %7.3f %7.3f %7.3f / f(x) = %10.3e %10.3e %10.3e\n", 
       i_iter,
       gsl_vector_get(s->x,0), gsl_vector_get(s->x,1), gsl_vector_get(s->x,2),
@@ -62,7 +135,7 @@ int prop_implicit_euler_in_sph_harm_basis(
     const std::complex<double> **psi_t_next_arr_arr,
     const double *rho_arr, const int *l_arr, const int *m_arr,
     const double *rho_p_lim, double delta_t, double thres, 
-    double r_p_t_vec[DIM_R], bool verbose)
+    double r_p_t_vec[DIM_R], double r_p_vec_initial[DIM_R], bool verbose)
 {
 
 
@@ -101,45 +174,85 @@ int prop_implicit_euler_in_sph_harm_basis(
   
 
   //// Set up solver
-  const gsl_multiroot_fsolver_type *T; 
-  gsl_multiroot_fsolver *s;
-  T = gsl_multiroot_fsolver_hybrids;
-  s = gsl_multiroot_fsolver_alloc(T, DIM_R);
+//  const gsl_multiroot_fsolver_type *T; 
+//  gsl_multiroot_fsolver *s;
+//  T = gsl_multiroot_fsolver_hybrids;
+//  s = gsl_multiroot_fsolver_alloc(T, DIM_R);
+
+  const gsl_multiroot_fdfsolver_type *T;
+  gsl_multiroot_fdfsolver *s;
+  T = gsl_multiroot_fdfsolver_hybridsj;
+//  T = gsl_multiroot_fdfsolver_hybridj;
+//  T = gsl_multiroot_fdfsolver_gnewton;
+  s = gsl_multiroot_fdfsolver_alloc(T, DIM_R);
+  
+
   struct g_param g_param = {
     N_s, N_rho, N_lm, psi_t_next_arr_arr, rho_arr, l_arr, m_arr, rho_p_lim, 
     delta_t, {r_p_t_vec[0], r_p_t_vec[1], r_p_t_vec[2]}
   };
-  gsl_multiroot_function f = {&implicit_euler_fzero_func, DIM_R, &g_param};
-//  const double x_init[2] = {-10.0, -5.0};
+
+//  gsl_multiroot_function f = {&implicit_euler_fzero_func, DIM_R, &g_param};
+  gsl_multiroot_function_fdf f = {
+    &implicit_euler_fzero_func, &implicit_euler_fzero_dfunc, &implicit_euler_fzero_fdfunc, DIM_R, &g_param};
+
+
+  //// Propagate as an initial guess
+//  int return_code = EXIT_FAILURE;
+//  vec_t v_p_vec;
+//  return_code = eval_v_p_for_sph_harm_basis(
+//      N_s, N_rho, N_lm, r_p_t_vec, psi_t_next_arr_arr, rho_arr, 
+//      l_arr, m_arr, rho_p_lim, v_p_vec);
+//
+//  for (int i=0; i<DIM_R; i++) {
+//    r_p_initial[i] = r_p_t_vec[i] + detla_t * 
+//  }
+
+
+
   gsl_vector *r_p_initial = gsl_vector_alloc(DIM_R);
   for (int i=0; i<DIM_R; i++) 
-  { gsl_vector_set(r_p_initial, i, r_p_t_vec[i]); }
-  gsl_multiroot_fsolver_set(s, &f, r_p_initial);
+  { gsl_vector_set(r_p_initial, i, r_p_vec_initial[i]); }
+
+//  gsl_multiroot_fsolver_set(s, &f, r_p_initial);
+  gsl_multiroot_fdfsolver_set(s, &f, r_p_initial);
 
 
 
-  //// Iterate                                                                  
+  //// Iterate
+  
+  verbose = true;
+
   int iter_status, resi_status;                                                 
   int i_iter = 0;                                                            
-  print_state(i_iter, s);                                                       
-  do                                                                            
-  {                                                                             
-    i_iter++;                                                                   
-    iter_status = gsl_multiroot_fsolver_iterate(s);                             
-    print_state(i_iter, s);                                                     
+  if (verbose) { print_state(i_iter, s); }
+  do
+  {
+    i_iter++;
+    iter_status = gsl_multiroot_fdfsolver_iterate(s);
+//    iter_status = gsl_multiroot_fsolver_iterate(s);
+    
+    if (verbose) { print_state(i_iter, s); }
+
     if (iter_status != 0) { break; } // check if the solver is stuck            
-    resi_status = gsl_multiroot_test_residual(s->f, 1e-7);                      
-  }                                                                             
-  while (resi_status == GSL_CONTINUE && i_iter < 1000);                         
-  printf("residual status = %s\n", gsl_strerror(resi_status));
+    resi_status = gsl_multiroot_test_residual(s->f, thres);
+  }
+  while (resi_status == GSL_CONTINUE && i_iter < NEWTON_ITER_MAX); 
+  if (verbose) { printf("residual status = %s\n", gsl_strerror(resi_status)); }
+  if (verbose) { printf("iterationg status = %s\n", gsl_strerror(iter_status)); }
 
   //// Store result
   for (int i=0; i<DIM_R; i++) 
   { r_p_t_vec[i] = gsl_vector_get(s->x,i); }
+
+  //// return error if anything had gone wrong
+  if (iter_status != 0 or i_iter >= NEWTON_ITER_MAX) 
+  { return debug_mesg("Something got wrong during implicit root finding"); }
   
 
  //// Deallocate
-  gsl_multiroot_fsolver_free(s);
+  gsl_multiroot_fdfsolver_free(s);
+//  gsl_multiroot_fsolver_free(s);
   gsl_vector_free(r_p_initial);
        
   return EXIT_SUCCESS;
