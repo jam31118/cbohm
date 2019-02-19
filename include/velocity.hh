@@ -18,6 +18,7 @@
 
 double vec_norm(vec_t vec);
 
+int move_to_canonical_range_of_sph_coord(vec_t r_vec);
 
 template <typename T>
 int eval_psi_deriv_p(
@@ -53,7 +54,7 @@ int eval_jac_v_3D(
 
 int eval_v_p_for_sph_harm_basis(
     const int N_s, const int N_rho, const int N_lm, 
-    const double r_p_vec[DIM_R], 
+    double r_p_vec[DIM_R], 
     const std::complex<double> **psi_in_sph_harm_basis_arr,
     const double *rho_arr, const int *l_arr, const int *m_arr, 
     const double *rho_p_lim, 

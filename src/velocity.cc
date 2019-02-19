@@ -366,7 +366,7 @@ template int eval_psi_and_dpsidx_arr< std::complex<double> >(
 
 
 
-//// Implementation of `eval_v_p_for_sph_harm_basis`
+//// Implementation of `eval_psi_and_di_psi_and_dj_di_psi_for_sph_harm_basis`
 int eval_psi_and_di_psi_and_dj_di_psi_for_sph_harm_basis(
     const int N_s, const int N_rho, const int N_lm, 
     const double r_p_vec[DIM_R], 
@@ -951,10 +951,34 @@ int eval_v_3D(const vec_t hi, const z_t di_psi[DIM_R], const z_t psi, vec_t vi)
 
 
 
+int move_to_canonical_range_of_sph_coord(vec_t r_vec) {
+  double rho=r_vec[0], theta=r_vec[1], phi=r_vec[2];
+  if (rho < 0) { 
+    rho *= -1.0;
+    theta = M_PI - theta;
+    phi += M_PI;
+  }
+  if (theta < -M_PI or theta >= M_PI) {
+    theta = std::fmod(theta + M_PI, 2.0 * M_PI) - M_PI;
+    if (theta < 0) { 
+      theta *= -1.0;
+      phi += M_PI;
+    }
+  }
+  if (phi < 0.0 or phi >= 2.0 * M_PI) {
+    phi = std::fmod(phi, 2.0 * M_PI);
+  }
+  r_vec[0] = rho, r_vec[1] = theta, r_vec[2] = phi;
+  return EXIT_SUCCESS;
+}
+
+
+
+
 //// Implementation of `eval_v_p_for_sph_harm_basis`
 int eval_v_p_for_sph_harm_basis(
     const int N_s, const int N_rho, const int N_lm, 
-    const double r_p_vec[DIM_R], 
+    double r_p_vec[DIM_R], 
     const std::complex<double> **psi_in_sph_harm_basis_arr,
     const double *rho_arr, const int *l_arr, const int *m_arr, 
     const double *rho_p_lim, 
@@ -964,6 +988,15 @@ int eval_v_p_for_sph_harm_basis(
   int return_code = EXIT_FAILURE;
   z_t psi, di_psi[DIM_R], dj_di_psi[DIM_R][DIM_R]; 
   vec_t hi; jac_t dj_hi;
+
+
+//  vec_t r_p_vec;
+//  for (int i=0; i<DIM_R; i++) 
+//  { r_p_vec[i] = r_p_vec_in[i]; }
+  return_code = move_to_canonical_range_of_sph_coord(r_p_vec);
+  if (return_code != EXIT_SUCCESS) 
+  { return debug_mesg("Failed to move to canonical range of spherical coord");}
+
 
 //  printf("[ LOG @ %s:%d:%s() ][!] jac is NULL: '%d'\n", __FILE__, __LINE__, __func__, jac==NULL);
 
@@ -976,6 +1009,8 @@ int eval_v_p_for_sph_harm_basis(
         N_s, N_rho, N_lm, r_p_vec, psi_in_sph_harm_basis_arr, rho_arr,
         l_arr, m_arr, rho_p_lim, &psi, di_psi, dj_di_psi);
   }
+  if (return_code != EXIT_SUCCESS) 
+  { return debug_mesg("Failed evaluating deriv psi and its Jacobian"); }
 
 //  printf("[ LOG @ %s:%d:%s() ][!] psi: (%10.5f,%10.5f)\n", __FILE__, __LINE__, __func__, psi.real(), psi.imag());
 
@@ -992,12 +1027,11 @@ int eval_v_p_for_sph_harm_basis(
 //    } printf("\n");
 //  } printf("\n");
 
-  if (return_code != EXIT_SUCCESS) 
-  { return debug_mesg("Failed evaluating deriv psi and its Jacobian"); }
 
   return_code = eval_hi_and_dj_hi_for_sph_harm_basis(r_p_vec, hi, dj_hi);
   if (return_code != EXIT_SUCCESS) 
   { return debug_mesg("Failed evaluating hi and dj_hi"); }
+
 
 //  printf("[ LOG @ %s:%d:%s() ][!] hi: \n", __FILE__, __LINE__, __func__);
 //  for (int i=0; i<DIM_R; i++) { printf("%7.5f", hi[i]); }
@@ -1013,6 +1047,7 @@ int eval_v_p_for_sph_harm_basis(
 //  for (int i=0; i<DIM_R; i++) { printf("%7.5f", v_p_vec[i]); }
 //  printf("\n");
 
+
   if (jac != NULL) {
     return_code = eval_jac_v_3D(dj_hi, hi, dj_di_psi, di_psi, psi, jac);
     if (return_code != EXIT_SUCCESS) 
@@ -1025,6 +1060,11 @@ int eval_v_p_for_sph_harm_basis(
 //    printf("[ LOG @ %s:%d ] jac: \n", __FILE__, __LINE__);
 //    print_jac_t(jac);
 //  }
+
+
+//  if (v_p_vec[0] == std::nan("") or v_p_vec[1] == std::nan("") or v_p_vec[2] == std::nan(""))    
+//  { return debug_mesg("NAN happended"); } 
+
 
   return EXIT_SUCCESS;
 
@@ -1134,22 +1174,40 @@ int eval_v_p_arr_for_sph_harm_basis(
   for (int i_p = 0; i_p < N_p; i_p++) {
 
     for (int i_dim = 0; i_dim < DIM_R; i_dim++)
-    { r_p_vec[i_dim] = r_p_arr[i_dim][i_p]; }
-
-    if (jac_p_arr == NULL) { 
-      return_code = eval_v_p_for_sph_harm_basis(
-          N_s, N_rho, N_lm, r_p_vec, psi_in_sph_harm_basis_arr,
-          rho_arr, l_arr, m_arr, rho_p_lim, v_p_vec);
-    } else {
-      return_code = eval_v_p_for_sph_harm_basis(
-          N_s, N_rho, N_lm, r_p_vec, psi_in_sph_harm_basis_arr,
-          rho_arr, l_arr, m_arr, rho_p_lim, v_p_vec, jac_p_arr[i_p]);
+    { 
+      v_p_vec[i_dim] = v_p_arr[i_dim][i_p];
+      r_p_vec[i_dim] = r_p_arr[i_dim][i_p]; 
     }
-    if (return_code != EXIT_SUCCESS) 
-    { return debug_mesg("Failed during 'eval_v_p_for_sph_harm_basis()'"); }
+
+    bool out_of_range = r_p_vec[0] < rho_p_lim[0] or r_p_vec[0] >= rho_p_lim[1];
+    if (out_of_range) {
+      for (int i=0; i<DIM_R; i++) { v_p_vec[i] = 0.0; }
+    } else {
+  
+      if (jac_p_arr == NULL) { 
+        return_code = eval_v_p_for_sph_harm_basis(
+            N_s, N_rho, N_lm, r_p_vec, psi_in_sph_harm_basis_arr,
+            rho_arr, l_arr, m_arr, rho_p_lim, v_p_vec);
+      } else {
+        return_code = eval_v_p_for_sph_harm_basis(
+            N_s, N_rho, N_lm, r_p_vec, psi_in_sph_harm_basis_arr,
+            rho_arr, l_arr, m_arr, rho_p_lim, v_p_vec, jac_p_arr[i_p]);
+      }
+      if (return_code != EXIT_SUCCESS) 
+      { return debug_mesg("Failed during 'eval_v_p_for_sph_harm_basis()'"); }
+    }
+
 
     for (int i_dim = 0; i_dim < DIM_R; i_dim++)
-    { v_p_arr[i_dim][i_p] = v_p_vec[i_dim]; }
+    { 
+      r_p_arr[i_dim][i_p] = r_p_vec[i_dim];
+      v_p_arr[i_dim][i_p] = v_p_vec[i_dim]; 
+    }
+
+    for (int i=0; i<DIM_R; i++) {
+      if ( std::isnan(v_p_vec[i]) or std::isinf(v_p_vec[i]) ) 
+      { return debug_mesg("nan or inf"); }
+    }
 
   } // for-loop : i_p
 
